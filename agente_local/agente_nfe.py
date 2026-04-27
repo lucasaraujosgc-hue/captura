@@ -2,21 +2,128 @@ import os
 import time
 import sqlite3
 import requests
+import json
 import xml.etree.ElementTree as ET
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# ==========================================
-# CONFIGURAÇÕES DO AGENTE LOCAL
-# ==========================================
-API_URL = "https://nfe.virgulacontabil.com.br/api/upload" # Altere para o IP/URL do seu VPS em produção
-API_TOKEN = "chave-secreta-vps-123"
-PASTA_MONITORADA = r"C:\Caminho\Para\XMLs" # Altere para a pasta raiz dos seus XMLs
-BANCO_LOCAL = "controle_xml.db"
+try:
+    import tkinter as tk
+    from tkinter import filedialog, messagebox, ttk
+except ImportError:
+    tk = None
 
-# Namespaces do XML da NFe
+# ==========================================
+# CONSTANTES
+# ==========================================
+BANCO_LOCAL = "controle_xml.db"
+CONFIG_FILE = "config.json"
 NS = {'ns': 'http://www.portalfiscal.inf.br/nfe'}
 
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        return None
+    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_config(config):
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=4)
+
+# ==========================================
+# CONFIGURADOR VISUAL (TKINTER)
+# ==========================================
+def run_configurator():
+    if not tk:
+        print("Interface gráfica não disponível. Crie o config.json manualmente.")
+        return None
+
+    root = tk.Tk()
+    root.title("NFe Automator - Configuração Inicial")
+    root.geometry("600x500")
+
+    config_data = {
+        "api_url": "https://nfe.virgulacontabil.com.br/api/upload",
+        "api_token": "",
+        "monitoramentos": []
+    }
+
+    # API
+    tk.Label(root, text="URL do Servidor (API):", font=("Arial", 10, "bold")).pack(pady=(10, 0), anchor="w", padx=20)
+    ent_url = tk.Entry(root, width=80)
+    ent_url.insert(0, config_data["api_url"])
+    ent_url.pack(padx=20)
+
+    tk.Label(root, text="Token da Empresa (Gerado no site):", font=("Arial", 10, "bold")).pack(pady=(10, 0), anchor="w", padx=20)
+    ent_token = tk.Entry(root, width=80)
+    ent_token.pack(padx=20)
+
+    tk.Label(root, text="Pastas Monitoradas:", font=("Arial", 10, "bold")).pack(pady=(10, 0), anchor="w", padx=20)
+    
+    frame_pastas = tk.Frame(root)
+    frame_pastas.pack(fill="x", padx=20, pady=5)
+    
+    tree = ttk.Treeview(frame_pastas, columns=("Tipo", "Modalidade", "Mapeamento"), show="headings", height=5)
+    tree.heading("Tipo", text="Entrada/Saída")
+    tree.heading("Modalidade", text="Modelo (55/65)")
+    tree.heading("Mapeamento", text="Pasta")
+    tree.pack(fill="x")
+
+    def add_pasta():
+        folder = filedialog.askdirectory(title="Selecione a pasta")
+        if not folder: return
+        
+        win_det = tk.Toplevel(root)
+        win_det.title("Detalhes da Pasta")
+        
+        tk.Label(win_det, text="Tipo de Nota:").pack()
+        cb_tipo = ttk.Combobox(win_det, values=["Entrada", "Saida", "Cancelada", "Inutilizada"])
+        cb_tipo.current(0)
+        cb_tipo.pack()
+        
+        tk.Label(win_det, text="Modalidade:").pack()
+        cb_mod = ttk.Combobox(win_det, values=["55 (NFe)", "65 (NFCe)"])
+        cb_mod.current(0)
+        cb_mod.pack()
+        
+        def save_pasta():
+            tree.insert("", "end", values=(cb_tipo.get(), cb_mod.get()[:2], folder))
+            config_data["monitoramentos"].append({
+                "pasta": folder,
+                "tipo": cb_tipo.get(),
+                "modelo_esperado": cb_mod.get()[:2]
+            })
+            win_det.destroy()
+            
+        tk.Button(win_det, text="Salvar Pasta", command=save_pasta).pack(pady=10)
+
+    btn_add = tk.Button(root, text="Adicionar Pasta ao Monitoramento+", command=add_pasta)
+    btn_add.pack(pady=5)
+
+    def concluir():
+        token = ent_token.get().strip()
+        url = ent_url.get().strip()
+        if not token or not url:
+            messagebox.showerror("Erro", "Token e URL são obrigatórios.")
+            return
+        if not config_data["monitoramentos"]:
+            messagebox.showerror("Erro", "Adicione pelo menos uma pasta para monitorar.")
+            return
+        
+        config_data["api_token"] = token
+        config_data["api_url"] = url
+        save_config(config_data)
+        messagebox.showinfo("Sucesso", "Configuração salva com sucesso! O Agente será iniciado.")
+        root.destroy()
+
+    tk.Button(root, text="Salvar e Iniciar", command=concluir, bg="green", fg="white", font=("Arial", 12, "bold")).pack(pady=20)
+    root.mainloop()
+
+    return load_config()
+
+# ==========================================
+# AGENTE
+# ==========================================
 def init_db():
     conn = sqlite3.connect(BANCO_LOCAL)
     cursor = conn.cursor()
@@ -60,26 +167,21 @@ def aguardar_arquivo_pronto(filepath, timeout=10):
             time.sleep(1)
     return False
 
-def processar_xml(filepath):
+def processar_xml(filepath, config, monitoramento):
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
 
-        # Verifica se é procNFe ou procNFCe
         infNFe = root.find('.//ns:infNFe', NS)
-        if infNFe is None:
-            return None # Não é um XML de NFe/NFCe válido
+        if infNFe is None: return None
 
-        # Busca dados chave
         chave_nfe = infNFe.attrib.get('Id', '').replace('NFe', '')
-        if not chave_nfe:
-            return None
+        if not chave_nfe: return None
 
         if is_processado(chave_nfe):
             print(f"[{time.strftime('%H:%M:%S')}] Pulo: Chave {chave_nfe} já enviada.")
             return True
 
-        # Extrair dados principais
         ide = infNFe.find('ns:ide', NS)
         modelo = ide.find('ns:mod', NS).text if ide is not None else ""
         data_emissao = ide.find('ns:dhEmi', NS).text if (ide is not None and ide.find('ns:dhEmi', NS) is not None) else (ide.find('ns:dEmi', NS).text if ide is not None and ide.find('ns:dEmi', NS) is not None else "")
@@ -89,21 +191,15 @@ def processar_xml(filepath):
         nome_fornecedor = emit.find('ns:xNome', NS).text if emit is not None else ""
 
         dest = infNFe.find('ns:dest', NS)
-        cnpj_destinatario = ""
-        nome_destinatario = ""
-        if dest is not None:
-            if dest.find('ns:CNPJ', NS) is not None:
-                cnpj_destinatario = dest.find('ns:CNPJ', NS).text
-            elif dest.find('ns:CPF', NS) is not None:
-                cnpj_destinatario = dest.find('ns:CPF', NS).text
-            nome_destinatario = dest.find('ns:xNome', NS).text if dest.find('ns:xNome', NS) is not None else ""
+        cnpj_destinatario = dest.find('ns:CNPJ', NS).text if (dest is not None and dest.find('ns:CNPJ', NS) is not None) else ""
+        nome_destinatario = dest.find('ns:xNome', NS).text if (dest is not None and dest.find('ns:xNome', NS) is not None) else ""
 
         total = infNFe.find('.//ns:total/ns:ICMSTot/ns:vNF', NS)
         valor_total = total.text if total is not None else "0.00"
 
-        # Validando se pertence ao modelo 55 ou 65
-        if modelo not in ['55', '65']:
-            return True # Ignorar sem dar erro
+        # status and tipo from the folder configuration
+        status = monitoramento.get("tipo", "Autorizada")
+        tipo = "Entrada" if status == "Entrada" else ("Saida" if status == "Saida" else "Outro")
 
         payload = {
             "chave_nfe": chave_nfe,
@@ -113,19 +209,18 @@ def processar_xml(filepath):
             "nome_fornecedor": nome_fornecedor,
             "cnpj_destinatario": cnpj_destinatario,
             "nome_destinatario": nome_destinatario,
-            "valor_total": valor_total
+            "valor_total": valor_total,
+            "tipo": tipo,
+            "status": status
         }
 
-        # Enviar para a API
-        headers = {
-            "Authorization": f"Bearer {API_TOKEN}"
-        }
+        headers = {"Authorization": f"Bearer {config['api_token']}"}
 
         with open(filepath, 'rb') as f:
             files = {'file': (os.path.basename(filepath), f, 'application/xml')}
-            response = requests.post(API_URL, headers=headers, data=payload, files=files)
+            response = requests.post(config['api_url'], headers=headers, data=payload, files=files)
 
-        if response.status_code in [201, 200, 409]: # Se já existe (409) ou criou (201/200), registramos como OK
+        if response.status_code in [201, 200, 409]:
             registrar_processado(chave_nfe, filepath)
             print(f"[{time.strftime('%H:%M:%S')}] Sucesso: NFe {chave_nfe} enviada com sucesso.")
             return True
@@ -138,41 +233,49 @@ def processar_xml(filepath):
         return False
 
 class XMLHandler(FileSystemEventHandler):
+    def __init__(self, config, monitoramento):
+        self.config = config
+        self.monitoramento = monitoramento
+
     def on_created(self, event):
         if not event.is_directory and event.src_path.lower().endswith('.xml'):
-            print(f"[{time.strftime('%H:%M:%S')}] Novo XML detectado: {event.src_path}")
+            print(f"[{time.strftime('%H:%M:%S')}] Novo XML detectado na pasta {self.monitoramento['pasta']}")
             if aguardar_arquivo_pronto(event.src_path):
-                processar_xml(event.src_path)
+                processar_xml(event.src_path, self.config, self.monitoramento)
 
 def iniciar_monitoramento():
-    if not os.path.exists(PASTA_MONITORADA):
-        print(f"Aviso: A pasta {PASTA_MONITORADA} não existe. Criando...")
-        os.makedirs(PASTA_MONITORADA, exist_ok=True)
+    config = load_config()
+    if not config:
+        config = run_configurator()
+        if not config:
+            return
 
     init_db()
-
-    # Processar antigos que possam ter ficado pra trás
-    print("Inspecionando arquivos já existentes na pasta...")
-    for root, dirs, files in os.walk(PASTA_MONITORADA):
-        for file in files:
-            if file.lower().endswith('.xml'):
-                processar_xml(os.path.join(root, file))
-
-    event_handler = XMLHandler()
     observer = Observer()
-    observer.schedule(event_handler, PASTA_MONITORADA, recursive=True)
-    observer.start()
 
-    print(f"\\n[{time.strftime('%H:%M:%S')}] Agente NFe Automator iniciado.")
-    print(f"Monitorando (Recursivamente): {PASTA_MONITORADA}\\n")
+    for mon in config.get("monitoramentos", []):
+        pasta = mon["pasta"]
+        if not os.path.exists(pasta):
+            print(f"Aviso: {pasta} não existe. Criando...")
+            os.makedirs(pasta, exist_ok=True)
+            
+        print(f"Inspecionando {pasta}...")
+        for root, dirs, files in os.walk(pasta):
+            for file in files:
+                if file.lower().endswith('.xml'):
+                    processar_xml(os.path.join(root, file), config, mon)
+
+        event_handler = XMLHandler(config, mon)
+        observer.schedule(event_handler, pasta, recursive=True)
+
+    observer.start()
+    print(f"\n[{time.strftime('%H:%M:%S')}] Agente Multi-Pastas inciado com sucesso.\n")
 
     try:
         while True:
             time.sleep(5)
     except KeyboardInterrupt:
         observer.stop()
-        print("Monitoramento encerrado pelo usuário.")
-    
     observer.join()
 
 if __name__ == "__main__":

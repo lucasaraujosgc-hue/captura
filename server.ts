@@ -5,6 +5,8 @@ import multer from "multer";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
+import archiver from "archiver";
 import { initDB, getDB } from "./src/db/db.js";
 
 const app = express();
@@ -13,14 +15,23 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-// Token setup for Agent authentication
-const AGENT_TOKEN = process.env.AGENT_TOKEN || "chave-secreta-vps-123";
-
-const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+const authMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || authHeader !== `Bearer ${AGENT_TOKEN}`) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Acesso negado. Token não informado." });
+  }
+  const token = authHeader.split(" ")[1];
+  
+  const db = getDB();
+  const empresa = await db.get("SELECT * FROM empresas WHERE token = ?", [token]);
+  
+  if (!empresa) {
     return res.status(401).json({ error: "Acesso negado. Token inválido." });
   }
+
+  // We assign the empresa to the request so upload knows which company it belongs to
+  (req as any).empresa_id = empresa.id;
+  (req as any).cnpj_empresa = empresa.cnpj;
   next();
 };
 
@@ -45,33 +56,30 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
 
     // Validate parsed metadata from Agent
     const data = req.body;
-    if (!data.chave_nfe || !data.cnpj_destinatario || !data.modelo) {
+    if (!data.chave_nfe || !data.modelo) {
       return res.status(400).json({ error: "Dados extraídos incompletos." });
     }
 
     const {
       chave_nfe,
-      cnpj_destinatario,
-      nome_destinatario,
       data_emissao,
       valor_total,
       modelo,
       cnpj_fornecedor,
-      nome_fornecedor
+      nome_fornecedor,
+      tipo,
+      status
     } = data;
+
+    // The enterprise comes from the token
+    const empresa_id = (req as any).empresa_id;
+    const cnpj_destinatario = (req as any).cnpj_empresa;
 
     // Check if duplicate
     const checkDupe = await db.get("SELECT * FROM notas WHERE chave_nfe = ?", [chave_nfe]);
     if (checkDupe) {
       fs.unlinkSync(file.path); // remove tmp
       return res.status(409).json({ error: "XML já processado." });
-    }
-
-    // Upsert Empresa (Destinatário)
-    let empresa = await db.get("SELECT id FROM empresas WHERE cnpj = ?", [cnpj_destinatario]);
-    if (!empresa) {
-      const result = await db.run("INSERT INTO empresas (nome, cnpj) VALUES (?, ?)", [nome_destinatario || "Desconhecido", cnpj_destinatario]);
-      empresa = { id: result.lastID };
     }
 
     // Determine final path: /uploads/empresa/CNPJ/ANO/MES/CHAVE.xml
@@ -97,17 +105,19 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
     await db.run(`
       INSERT INTO notas (
         empresa_id, chave_nfe, fornecedor, cnpj_fornecedor, 
-        data_emissao, valor_total, modelo, caminho_arquivo
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        data_emissao, valor_total, modelo, caminho_arquivo, tipo, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      empresa.id,
+      empresa_id,
       chave_nfe,
       nome_fornecedor || "Desconhecido",
       cnpj_fornecedor || "000",
       data_emissao || null,
       parseFloat(valor_total) || 0.0,
       modelo,
-      `/uploads/empresas/${cnpj_destinatario}/${ano}/${mes}/${chave_nfe}.xml` // Relative URL path
+      `/uploads/empresas/${cnpj_destinatario}/${ano}/${mes}/${chave_nfe}.xml`, // Relative URL path
+      tipo || null,
+      status || null
     ]);
 
     res.status(201).json({ success: true, message: "Nota processada com sucesso." });
@@ -158,11 +168,30 @@ app.get("/api/empresas", async (req, res) => {
   }
 });
 
+app.post("/api/empresas", async (req, res) => {
+  try {
+    const db = getDB();
+    const { nome, cnpj } = req.body;
+    if (!nome || !cnpj) return res.status(400).json({ error: "Nome e CNPJ são obrigatórios." });
+
+    const check = await db.get("SELECT id FROM empresas WHERE cnpj = ?", [cnpj]);
+    if (check) return res.status(400).json({ error: "Empresa com este CNPJ já existe." });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const result = await db.run("INSERT INTO empresas (nome, cnpj, token) VALUES (?, ?, ?)", [nome, cnpj, token]);
+    
+    res.status(201).json({ success: true, id: result.lastID, token });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao cadastrar empresa." });
+  }
+});
+
 // 4. Fetch Notas (with filters)
 app.get("/api/notas", async (req, res) => {
   try {
     const db = getDB();
-    const { empresa_id, data_inicio, data_fim, fornecedor } = req.query;
+    const { empresa_id, data_inicio, data_fim, fornecedor, tipo } = req.query;
     
     let query = `
       SELECT n.*, e.nome as nome_empresa, e.cnpj as cnpj_empresa
@@ -177,18 +206,20 @@ app.get("/api/notas", async (req, res) => {
       params.push(empresa_id);
     }
     if (data_inicio) {
-      // Basic approach: comparison operator since format is ISO YYYY-MM-DD
       query += " AND n.data_emissao >= ?";
       params.push(data_inicio);
     }
     if (data_fim) {
-      // Append time max to ensure 'YYYY-MM-DD' captures the full day
       query += " AND n.data_emissao <= ?";
       params.push(data_fim + 'T23:59:59'); 
     }
     if (fornecedor && typeof fornecedor === 'string') {
       query += " AND n.fornecedor LIKE ?";
       params.push('%' + fornecedor + '%');
+    }
+    if (tipo && typeof tipo === 'string') {
+      query += " AND n.tipo = ?";
+      params.push(tipo);
     }
 
     query += " ORDER BY n.data_emissao DESC LIMIT 100";
@@ -198,6 +229,44 @@ app.get("/api/notas", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erro ao buscar notas." });
+  }
+});
+
+// 5. Download in Lote
+app.get("/api/download-batch", async (req, res) => {
+  try {
+    const db = getDB();
+    const { ids } = req.query;
+    if (!ids || typeof ids !== 'string') return res.status(400).json({ error: "IDs não fornecidos." });
+
+    const idsArray = ids.split(",").map(id => parseInt(id)).filter(id => !isNaN(id));
+    if (idsArray.length === 0) return res.status(400).json({ error: "Nenhum ID válido fornecido." });
+
+    const placeholders = idsArray.map(() => '?').join(',');
+    const notas = await db.all(`SELECT caminho_arquivo, chave_nfe FROM notas WHERE id IN (${placeholders})`, idsArray);
+
+    if (notas.length === 0) return res.status(404).json({ error: "Nenhuma nota encontrada." });
+
+    res.writeHead(200, {
+      'Content-Type': 'application/zip',
+      'Content-disposition': `attachment; filename=notas_${Date.now()}.zip`
+    });
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(res);
+
+    for (const nota of notas) {
+      const filePathRelative = nota.caminho_arquivo.startsWith("/uploads/") ? nota.caminho_arquivo.substring(9) : nota.caminho_arquivo;
+      const fullPath = path.join(uploadDir, filePathRelative);
+      if (fs.existsSync(fullPath)) {
+        archive.file(fullPath, { name: `${nota.chave_nfe}.xml` });
+      }
+    }
+
+    await archive.finalize();
+  } catch (error) {
+    console.error(error);
+    if (!res.headersSent) res.status(500).json({ error: "Erro ao gerar arquivo zip." });
   }
 });
 

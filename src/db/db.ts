@@ -35,6 +35,10 @@ export async function initDB() {
       FOREIGN KEY (empresa_id) REFERENCES empresas(id)
     );
   `);
+
+  try { await dbInstance.exec("ALTER TABLE empresas ADD COLUMN token TEXT UNIQUE;"); } catch (e) {}
+  try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN tipo TEXT;"); } catch (e) {}
+  try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN status TEXT;"); } catch (e) {}
 }
 
 export function getDB() {

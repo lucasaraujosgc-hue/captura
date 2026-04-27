@@ -8,6 +8,7 @@ import { LayoutDashboard, Building2, FileText, UploadCloud } from "lucide-react"
 import Dashboard from "./pages/Dashboard";
 import Empresas from "./pages/Empresas";
 import Notas from "./pages/Notas";
+import EmpresaDetails from "./pages/EmpresaDetails";
 
 export default function App() {
   return (
@@ -23,7 +24,6 @@ export default function App() {
         <nav className="flex-1 px-4 space-y-2">
           <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
           <NavItem to="/empresas" icon={Building2} label="Empresas" />
-          <NavItem to="/notas" icon={FileText} label="Notas Fiscais" />
         </nav>
       </aside>
 
@@ -32,7 +32,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/empresas" element={<Empresas />} />
-          <Route path="/notas" element={<Notas />} />
+          <Route path="/empresas/:id" element={<EmpresaDetails />} />
         </Routes>
       </main>
     </div>
