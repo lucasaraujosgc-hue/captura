@@ -20,7 +20,8 @@ export async function initDB() {
     CREATE TABLE IF NOT EXISTS empresas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT NOT NULL,
-      cnpj TEXT NOT NULL UNIQUE
+      cnpj TEXT NOT NULL UNIQUE,
+      token TEXT
     );
 
     CREATE TABLE IF NOT EXISTS notas (
@@ -33,11 +34,14 @@ export async function initDB() {
       valor_total REAL,
       modelo TEXT,
       caminho_arquivo TEXT,
+      tipo TEXT,
+      status TEXT,
+      hostname TEXT,
       FOREIGN KEY (empresa_id) REFERENCES empresas(id)
     );
   `);
 
-  try { await dbInstance.exec("ALTER TABLE empresas ADD COLUMN token TEXT UNIQUE;"); } catch (e) {}
+  try { await dbInstance.exec("ALTER TABLE empresas ADD COLUMN token TEXT;"); } catch (e) {}
   try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN tipo TEXT;"); } catch (e) {}
   try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN status TEXT;"); } catch (e) {}
   try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN hostname TEXT;"); } catch (e) {}
