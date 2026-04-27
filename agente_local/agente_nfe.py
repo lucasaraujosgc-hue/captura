@@ -9,7 +9,7 @@ from watchdog.events import FileSystemEventHandler
 # ==========================================
 # CONFIGURAÇÕES DO AGENTE LOCAL
 # ==========================================
-API_URL = "http://localhost:3000/api/upload" # Altere para o IP/URL do seu VPS em produção
+API_URL = "https://nfe.virgulacontabil.com.br/api/upload" # Altere para o IP/URL do seu VPS em produção
 API_TOKEN = "chave-secreta-vps-123"
 PASTA_MONITORADA = r"C:\Caminho\Para\XMLs" # Altere para a pasta raiz dos seus XMLs
 BANCO_LOCAL = "controle_xml.db"
