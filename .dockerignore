@@ -1,0 +1,8 @@
+node_modules
+dist
+uploads
+notas.db
+.env
+.git
+.gitignore
+agente_local
