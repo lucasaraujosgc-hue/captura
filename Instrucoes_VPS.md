@@ -23,8 +23,8 @@ docker-compose up -d --build
 ```
 
 O Docker criará:
-- Um volume em `./data/notas.db` para o banco de dados não ser perdido entre reinicializações.
-- Um volume em `./uploads/` para os XMLs recebidos.
+- Um volume em `/backup/data/` (no servidor físico) contendo o `notas.db`, para o banco de dados não ser perdido entre reinicializações.
+- Um volume em `/backup/uploads/` para armazenar permanentemente os XMLs recebidos.
 - Exporá a aplicação na porta `3000` do VPS internamente.
 
 Para ver os logs e acompanhar se iniciou com sucesso:

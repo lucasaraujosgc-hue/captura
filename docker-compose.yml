@@ -11,5 +11,5 @@ services:
       - NODE_ENV=production
       - AGENT_TOKEN=chave-secreta-vps-123
     volumes:
-      - ./uploads:/app/uploads
-      - ./data:/app/data
+      - /backup/uploads:/app/uploads
+      - /backup/data:/app/data
