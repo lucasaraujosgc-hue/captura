@@ -3,9 +3,16 @@ import time
 import sqlite3
 import requests
 import json
+import logging
 import xml.etree.ElementTree as ET
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+logging.basicConfig(
+    filename="agente.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 try:
     import tkinter as tk
@@ -179,7 +186,7 @@ def processar_xml(filepath, config, monitoramento):
         if not chave_nfe: return None
 
         if is_processado(chave_nfe):
-            print(f"[{time.strftime('%H:%M:%S')}] Pulo: Chave {chave_nfe} já enviada.")
+            logging.info(f"Pulo: Chave {chave_nfe} já enviada.")
             return True
 
         ide = infNFe.find('ns:ide', NS)
@@ -211,7 +218,8 @@ def processar_xml(filepath, config, monitoramento):
             "nome_destinatario": nome_destinatario,
             "valor_total": valor_total,
             "tipo": tipo,
-            "status": status
+            "status": status,
+            "hostname": os.environ.get("COMPUTERNAME", "Desconhecido")
         }
 
         headers = {"Authorization": f"Bearer {config['api_token']}"}
@@ -222,14 +230,14 @@ def processar_xml(filepath, config, monitoramento):
 
         if response.status_code in [201, 200, 409]:
             registrar_processado(chave_nfe, filepath)
-            print(f"[{time.strftime('%H:%M:%S')}] Sucesso: NFe {chave_nfe} enviada com sucesso.")
+            logging.info(f"Sucesso: NFe {chave_nfe} enviada com sucesso.")
             return True
         else:
-            print(f"[{time.strftime('%H:%M:%S')}] Erro servidor ({response.status_code}): {response.text}")
+            logging.error(f"Erro servidor ({response.status_code}): {response.text}")
             return False
 
     except Exception as e:
-        print(f"[{time.strftime('%H:%M:%S')}] Falha ao processar {filepath}: {e}")
+        logging.error(f"Falha ao processar {filepath}: {e}")
         return False
 
 class XMLHandler(FileSystemEventHandler):
@@ -239,7 +247,7 @@ class XMLHandler(FileSystemEventHandler):
 
     def on_created(self, event):
         if not event.is_directory and event.src_path.lower().endswith('.xml'):
-            print(f"[{time.strftime('%H:%M:%S')}] Novo XML detectado na pasta {self.monitoramento['pasta']}")
+            logging.info(f"Novo XML detectado na pasta {self.monitoramento['pasta']}")
             if aguardar_arquivo_pronto(event.src_path):
                 processar_xml(event.src_path, self.config, self.monitoramento)
 
@@ -256,10 +264,10 @@ def iniciar_monitoramento():
     for mon in config.get("monitoramentos", []):
         pasta = mon["pasta"]
         if not os.path.exists(pasta):
-            print(f"Aviso: {pasta} não existe. Criando...")
+            logging.warning(f"Aviso: {pasta} não existe. Criando...")
             os.makedirs(pasta, exist_ok=True)
             
-        print(f"Inspecionando {pasta}...")
+        logging.info(f"Inspecionando {pasta}...")
         for root, dirs, files in os.walk(pasta):
             for file in files:
                 if file.lower().endswith('.xml'):
@@ -269,7 +277,7 @@ def iniciar_monitoramento():
         observer.schedule(event_handler, pasta, recursive=True)
 
     observer.start()
-    print(f"\n[{time.strftime('%H:%M:%S')}] Agente Multi-Pastas inciado com sucesso.\n")
+    logging.info(f"Agente Multi-Pastas inciado com sucesso.")
 
     try:
         while True:

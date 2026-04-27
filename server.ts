@@ -68,7 +68,8 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
       cnpj_fornecedor,
       nome_fornecedor,
       tipo,
-      status
+      status,
+      hostname
     } = data;
 
     // The enterprise comes from the token
@@ -105,8 +106,8 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
     await db.run(`
       INSERT INTO notas (
         empresa_id, chave_nfe, fornecedor, cnpj_fornecedor, 
-        data_emissao, valor_total, modelo, caminho_arquivo, tipo, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        data_emissao, valor_total, modelo, caminho_arquivo, tipo, status, hostname
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       empresa_id,
       chave_nfe,
@@ -117,7 +118,8 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
       modelo,
       `/uploads/empresas/${cnpj_destinatario}/${ano}/${mes}/${chave_nfe}.xml`, // Relative URL path
       tipo || null,
-      status || null
+      status || null,
+      hostname || "Desconhecido"
     ]);
 
     res.status(201).json({ success: true, message: "Nota processada com sucesso." });

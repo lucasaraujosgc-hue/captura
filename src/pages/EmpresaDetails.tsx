@@ -175,6 +175,7 @@ export default function EmpresaDetails() {
                 <th className="px-6 py-4 font-medium">Mod/Tipo</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Fornecedor</th>
+                <th className="px-6 py-4 font-medium">Computador</th>
                 <th className="px-6 py-4 font-medium">Valor Total</th>
                 <th className="px-6 py-4 font-medium text-center">Ações</th>
               </tr>
@@ -182,7 +183,7 @@ export default function EmpresaDetails() {
             <tbody className="divide-y divide-gray-100">
               {notas.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     <div className="flex flex-col items-center justify-center">
                       <FileDown className="w-8 h-8 text-gray-300 mb-2" />
                       <p>Nenhuma nota fiscal encontrada para o filtro.</p>
@@ -227,6 +228,9 @@ export default function EmpresaDetails() {
                   <td className="px-6 py-4">
                     <div className="font-medium text-gray-900 truncate max-w-[200px]">{nota.fornecedor}</div>
                     <div className="text-xs text-gray-500">{nota.cnpj_fornecedor}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600">{nota.hostname || 'Desconhecido'}</span>
                   </td>
                   <td className="px-6 py-4 text-gray-900 font-medium">
                     {formatCurrency(nota.valor_total)}

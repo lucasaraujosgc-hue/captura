@@ -1,17 +1,18 @@
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import path from 'path';
+import fs from 'fs';
 
 let dbInstance: Database;
 
 export async function initDB() {
   const dataDir = path.join(process.cwd(), 'data');
-  import('fs').then(fs => {
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  });
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
 
   dbInstance = await open({
-    filename: path.join(process.cwd(), 'data', 'notas.db'),
+    filename: path.join(dataDir, 'notas.db'),
     driver: sqlite3.Database
   });
 
@@ -39,6 +40,7 @@ export async function initDB() {
   try { await dbInstance.exec("ALTER TABLE empresas ADD COLUMN token TEXT UNIQUE;"); } catch (e) {}
   try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN tipo TEXT;"); } catch (e) {}
   try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN status TEXT;"); } catch (e) {}
+  try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN hostname TEXT;"); } catch (e) {}
 }
 
 export function getDB() {
