@@ -36,14 +36,13 @@ const authMiddleware = async (req: express.Request, res: express.Response, next:
 };
 
 // Web Auth Middleware (Frontend Dashboard)
-const WEB_SECRET = "super_secret_" + crypto.randomBytes(8).toString('hex');
-
 const webAuthMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const envPassword = process.env.PASSWORD || "admin";
-  const expectedToken = crypto.createHmac('sha256', WEB_SECRET).update(envPassword).digest('hex');
+  const expectedToken = crypto.createHmac('sha256', "app_secret_salt").update(envPassword).digest('hex');
   
   // Exclude upload route and login route from this auth check
-  if (req.path === '/api/upload' || req.path === '/api/login') {
+  // Note: Since this is mounted on '/api', req.path is relative (e.g. '/login')
+  if (req.path === '/upload' || req.path === '/login') {
     return next();
   }
 
@@ -67,7 +66,7 @@ app.post('/api/login', (req, res) => {
   const envPassword = process.env.PASSWORD || "admin";
 
   if (password === envPassword) {
-    const token = crypto.createHmac('sha256', WEB_SECRET).update(envPassword).digest('hex');
+    const token = crypto.createHmac('sha256', "app_secret_salt").update(envPassword).digest('hex');
     res.json({ success: true, token });
   } else {
     res.status(401).json({ error: "Senha incorreta." });
