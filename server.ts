@@ -86,6 +86,11 @@ const _tmpUpload = multer({ dest: path.join(uploadDir, 'tmp') });
 // -- API ROUTES --
 
 // 1. Receive XML from Local Agent
+import { XMLParser } from "fast-xml-parser";
+
+// Helper to remove punctuation from CNPJ
+const cleanCnpj = (str: string) => str ? str.replace(/[^\d]+/g, '') : "";
+
 app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, res) => {
   try {
     const file = req.file;
@@ -93,27 +98,92 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
 
     const db = getDB();
 
-    // Validate parsed metadata from Agent
-    const data = req.body;
-    if (!data.chave_nfe || !data.modelo) {
-      return res.status(400).json({ error: "Dados extraídos incompletos." });
+    const empresa_id = (req as any).empresa_id;
+    const cnpj_empresa = cleanCnpj((req as any).cnpj_empresa);
+
+    const xmlData = fs.readFileSync(file.path, 'utf8');
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      removeNSPrefix: true,
+    });
+    const jsonObj = parser.parse(xmlData);
+
+    const nfe = jsonObj?.nfeProc?.NFe?.infNFe || jsonObj?.NFe?.infNFe || jsonObj?.nfeProc?.infNFe;
+    if (!nfe) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ error: "XML inválido: não encontrou dados da NFe." });
     }
 
-    const {
-      chave_nfe,
-      data_emissao,
-      valor_total,
-      modelo,
-      cnpj_fornecedor,
-      nome_fornecedor,
-      tipo,
-      status,
-      hostname
-    } = data;
+    const prot = jsonObj?.nfeProc?.protNFe?.infProt;
 
-    // The enterprise comes from the token
-    const empresa_id = (req as any).empresa_id;
-    const cnpj_destinatario = (req as any).cnpj_empresa;
+    // cStat / Status
+    let status = "Desconhecido";
+    if (prot && prot.cStat != null) {
+      const cStat = String(prot.cStat);
+      if (cStat === "100") status = "Autorizada";
+      else if (cStat === "101" || cStat === "135") status = "Cancelada";
+      else status = `cStat: ${cStat}`;
+    }
+
+    // Modelo
+    let modelo = "Desconhecido";
+    if (nfe?.ide?.mod != null) {
+      if (String(nfe.ide.mod) === "55") modelo = "NF-e";
+      else if (String(nfe.ide.mod) === "65") modelo = "NFC-e";
+      else modelo = String(nfe.ide.mod);
+    }
+
+    // Identificando Entrada ou Saída e Fornecedor/Cliente
+    let tipo = "";
+    let nome_fornecedor = "";
+    let cnpj_fornecedor = "";
+
+    const emitCnpj = cleanCnpj(nfe?.emit?.CNPJ || nfe?.emit?.CPF || "");
+    const emitNome = nfe?.emit?.xNome || "Desconhecido";
+    
+    const destCnpj = cleanCnpj(nfe?.dest?.CNPJ || nfe?.dest?.CPF || "");
+    const destNome = nfe?.dest?.xNome || "Cliente Diverso";
+
+    if (destCnpj === cnpj_empresa) {
+      tipo = "Entrada";
+      nome_fornecedor = emitNome;
+      cnpj_fornecedor = emitCnpj;
+    } else if (emitCnpj === cnpj_empresa) {
+      tipo = "Saída";
+      if (modelo === "NF-e") {
+        nome_fornecedor = destNome;
+        cnpj_fornecedor = destCnpj;
+      } else if (modelo === "NFC-e") {
+        nome_fornecedor = nfe?.dest ? destNome : "Cliente Diverso";
+        cnpj_fornecedor = destCnpj;
+      } else {
+        nome_fornecedor = destNome;
+        cnpj_fornecedor = destCnpj;
+      }
+    } else {
+      // Se não reconhecer nenhum dos dois, apenas preenche algo
+      tipo = "Desconhecido";
+      nome_fornecedor = emitNome;
+      cnpj_fornecedor = emitCnpj;
+    }
+
+    let chave_nfe = nfe["@_Id"] ? nfe["@_Id"].replace("NFe", "") : "";
+    if (!chave_nfe && req.body.chave_nfe) {
+      chave_nfe = req.body.chave_nfe; // fallback
+    }
+
+    if (!chave_nfe) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ error: "XML inválido: sem chave (Id) da NFe." });
+    }
+
+    let data_emissao = nfe?.ide?.dhEmi || nfe?.ide?.dEmi;
+    let valor_total = nfe?.total?.ICMSTot?.vNF || 0;
+
+    // Use req.body if not found
+    if (!data_emissao && req.body.data_emissao) data_emissao = req.body.data_emissao;
+    if (!valor_total && req.body.valor_total) valor_total = req.body.valor_total;
+    const hostname = req.body.hostname || req.body.computador || "Desconhecido";
 
     // Check if duplicate
     const checkDupe = await db.get("SELECT * FROM notas WHERE chave_nfe = ?", [chave_nfe]);
@@ -133,7 +203,7 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
       }
     }
 
-    const finalPathDir = path.join(uploadDir, "empresas", cnpj_destinatario, ano, mes);
+    const finalPathDir = path.join(uploadDir, "empresas", cnpj_empresa, ano, mes);
     if (!fs.existsSync(finalPathDir)) {
       fs.mkdirSync(finalPathDir, { recursive: true });
     }
@@ -155,10 +225,10 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
       data_emissao || null,
       parseFloat(valor_total) || 0.0,
       modelo,
-      `/uploads/empresas/${cnpj_destinatario}/${ano}/${mes}/${chave_nfe}.xml`, // Relative URL path
+      `/uploads/empresas/${cnpj_empresa}/${ano}/${mes}/${chave_nfe}.xml`, // Relative URL path
       tipo || null,
       status || null,
-      hostname || "Desconhecido",
+      hostname,
       file.size || 0
     ]);
 
@@ -304,6 +374,37 @@ app.delete("/api/notas", async (req, res) => {
   }
 });
 
+app.get("/api/danfe/:id", webAuthMiddleware, async (req, res) => {
+  try {
+    const db = getDB();
+    const nota = await db.get("SELECT * FROM notas WHERE id = ?", [req.params.id]);
+    if (!nota) return res.status(404).send("Nota não encontrada.");
+
+    let relativePath = nota.caminho_arquivo;
+    if (relativePath.startsWith("/uploads/")) {
+      relativePath = relativePath.substring(9);
+    }
+    const fullPath = path.join(uploadDir, relativePath);
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).send("Arquivo XML não encontrado no disco.");
+    }
+    const xml = fs.readFileSync(fullPath, "utf-8");
+
+    try {
+      const dDanfeModule = (await import("d-danfe")).default || await import("d-danfe");
+      const html = dDanfeModule.fromXML(xml).toHtml();
+      res.send(html);
+    } catch (err) {
+      console.error("Erro d-danfe:", err);
+      // Fallback
+      res.type('text/xml').send(xml);
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Erro interno ao gerar visualização.");
+  }
+});
+
 app.post("/api/empresas", async (req, res) => {
   try {
     const db = getDB();
@@ -380,6 +481,9 @@ app.get("/api/notas", async (req, res) => {
     const sumRow = await db.get(`SELECT SUM(tamanho_arquivo) as totalSize ${baseQuery}`, params);
     const totalSize = sumRow && sumRow.totalSize ? sumRow.totalSize : 0;
 
+    const valueRow = await db.get(`SELECT SUM(valor_total) as totalSum ${baseQuery}`, params);
+    const totalSum = valueRow && valueRow.totalSum ? valueRow.totalSum : 0;
+
     const pageNum = parseInt(page as string) || 1;
     const limitNum = parseInt(limit as string) || 20;
     const offset = (pageNum - 1) * limitNum;
@@ -393,6 +497,7 @@ app.get("/api/notas", async (req, res) => {
       notas,
       total,
       totalSize,
+      totalSum,
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { formatCurrency } from "../lib/utils";
-import { Search, Download, ArrowLeft, Building2, Calendar, FileDown } from "lucide-react";
+import { Search, Download, ArrowLeft, Building2, Calendar, FileDown, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { getAuthHeaders, getToken } from "../lib/auth";
 
@@ -10,6 +10,7 @@ export default function EmpresaDetails() {
   const [empresa, setEmpresa] = useState<any>(null);
   const [notas, setNotas] = useState<any[]>([]);
   const [totalNotas, setTotalNotas] = useState(0);
+  const [totalSum, setTotalSum] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   
@@ -58,12 +59,14 @@ export default function EmpresaDetails() {
       .then((data) => {
         setNotas(data.notas || []);
         setTotalNotas(data.total || 0);
+        setTotalSum(data.totalSum || 0);
         setTotalPages(data.totalPages || 1);
         setSelectedNotas([]); 
         setIsSelectAllContext(false);
       })
       .catch((err) => console.error(err));
   };
+
 
   useEffect(() => {
     setPage(1); // Reset page to 1 when filters change
@@ -213,9 +216,14 @@ export default function EmpresaDetails() {
 
       {/* Actions */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600 font-medium whitespace-nowrap">
-          {totalNotas} nota(s) encontrada(s)
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="text-sm text-gray-600 font-medium whitespace-nowrap">
+            {totalNotas} nota(s) encontrada(s)
+          </p>
+          <p className="text-sm text-green-700 font-bold bg-green-50 px-3 py-1 rounded-md border border-green-200">
+            Total: {formatCurrency(totalSum)}
+          </p>
+        </div>
         
         {isSelectAllContext ? (
           <div className="flex-1 px-4 flex items-center justify-center">
@@ -267,7 +275,6 @@ export default function EmpresaDetails() {
                 <th className="px-6 py-4 font-medium">Mod/Tipo</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Fornecedor</th>
-                <th className="px-6 py-4 font-medium">Computador</th>
                 <th className="px-6 py-4 font-medium">Valor Total</th>
                 <th className="px-6 py-4 font-medium text-center">Ações</th>
               </tr>
@@ -321,23 +328,31 @@ export default function EmpresaDetails() {
                     <div className="font-medium text-gray-900 truncate max-w-[200px]">{nota.fornecedor}</div>
                     <div className="text-xs text-gray-500">{nota.cnpj_fornecedor}</div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600">{nota.hostname || 'Desconhecido'}</span>
-                  </td>
                   <td className="px-6 py-4 text-gray-900 font-medium">
                     {formatCurrency(nota.valor_total)}
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <a 
-                      href={nota.caminho_arquivo} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                      download
-                      title="Baixar XML 1"
-                    >
-                      <Download className="w-4 h-4 cursor-pointer" />
-                    </a>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <a 
+                        href={`/api/danfe/${nota.id}?token=${getToken()}`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                        title="Visualizar DANFE"
+                      >
+                        <Eye className="w-4 h-4 cursor-pointer" />
+                      </a>
+                      <a 
+                        href={nota.caminho_arquivo} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                        download
+                        title="Baixar XML"
+                      >
+                        <Download className="w-4 h-4 cursor-pointer" />
+                      </a>
+                    </div>
                   </td>
                 </tr>
               ))}
