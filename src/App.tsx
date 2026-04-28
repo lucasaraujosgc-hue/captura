@@ -3,14 +3,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState, useEffect } from "react";
 import { Routes, Route, NavLink } from "react-router-dom";
-import { LayoutDashboard, Building2, FileText, UploadCloud } from "lucide-react";
+import { LayoutDashboard, Building2, FileText, UploadCloud, LogOut } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Empresas from "./pages/Empresas";
 import Notas from "./pages/Notas";
 import EmpresaDetails from "./pages/EmpresaDetails";
+import Login from "./pages/Login";
+import { getToken, logout } from "./lib/auth";
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = getToken();
+    if (token) {
+      setIsAuthenticated(true);
+    }
+    setLoading(false);
+  }, []);
+
+  if (loading) return null;
+
+  if (!isAuthenticated) {
+    return <Login onLogin={() => setIsAuthenticated(true)} />;
+  }
+
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
       {/* Sidebar */}
@@ -25,6 +45,15 @@ export default function App() {
           <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
           <NavItem to="/empresas" icon={Building2} label="Empresas" />
         </nav>
+        <div className="p-4 border-t border-gray-100">
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            Sair
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}

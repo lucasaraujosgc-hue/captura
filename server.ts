@@ -35,6 +35,45 @@ const authMiddleware = async (req: express.Request, res: express.Response, next:
   next();
 };
 
+// Web Auth Middleware (Frontend Dashboard)
+const WEB_SECRET = "super_secret_" + crypto.randomBytes(8).toString('hex');
+
+const webAuthMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const envPassword = process.env.PASSWORD || "admin";
+  const expectedToken = crypto.createHmac('sha256', WEB_SECRET).update(envPassword).digest('hex');
+  
+  // Exclude upload route and login route from this auth check
+  if (req.path === '/api/upload' || req.path === '/api/login') {
+    return next();
+  }
+
+  // Allow downloading directly from query string (for the window.open calls)
+  if (req.query.token === expectedToken) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader || authHeader !== `Bearer ${expectedToken}`) {
+    return res.status(401).json({ error: "Acesso negado ao painel. Faça login." });
+  }
+
+  next();
+};
+
+app.use('/api', webAuthMiddleware);
+
+app.post('/api/login', (req, res) => {
+  const { password } = req.body;
+  const envPassword = process.env.PASSWORD || "admin";
+
+  if (password === envPassword) {
+    const token = crypto.createHmac('sha256', WEB_SECRET).update(envPassword).digest('hex');
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ error: "Senha incorreta." });
+  }
+});
+
 // Ensure uploads folder exists
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -310,7 +349,7 @@ app.get("/api/download-filter", async (req, res) => {
 
     res.writeHead(200, {
       'Content-Type': 'application/zip',
-      'Content-disposition': \`attachment; filename=notas_\${Date.now()}.zip\`
+      'Content-disposition': `attachment; filename=notas_${Date.now()}.zip`
     });
 
     const archive = archiver('zip', { zlib: { level: 9 } });
@@ -320,7 +359,7 @@ app.get("/api/download-filter", async (req, res) => {
       const filePathRelative = nota.caminho_arquivo.startsWith("/uploads/") ? nota.caminho_arquivo.substring(9) : nota.caminho_arquivo;
       const fullPath = path.join(uploadDir, filePathRelative);
       if (fs.existsSync(fullPath)) {
-        archive.file(fullPath, { name: \`\${nota.chave_nfe}.xml\` });
+        archive.file(fullPath, { name: `${nota.chave_nfe}.xml` });
       }
     }
 

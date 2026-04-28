@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Building2, Plus, Copy, Check, ArrowRight, Search } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getAuthHeaders } from "../lib/auth";
 
 export default function Empresas() {
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -11,9 +12,12 @@ export default function Empresas() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const carregarEmpresas = () => {
-    fetch("/api/empresas")
-      .then((res) => res.json())
-      .then(setEmpresas)
+    fetch("/api/empresas", { headers: getAuthHeaders() })
+      .then((res) => {
+        if (!res.ok) throw new Error("Não autorizado");
+        return res.json();
+      })
+      .then((data) => setEmpresas(Array.isArray(data) ? data : []))
       .catch((err) => console.error(err));
   };
 
@@ -27,7 +31,10 @@ export default function Empresas() {
     try {
       const res = await fetch("/api/empresas", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...getAuthHeaders() 
+        },
         body: JSON.stringify({ nome, cnpj })
       });
       if (res.ok) {

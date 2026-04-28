@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { formatCurrency } from "../lib/utils";
 import { Search, Download, ArrowLeft, Building2, Calendar, FileDown } from "lucide-react";
 import { format } from "date-fns";
+import { getAuthHeaders, getToken } from "../lib/auth";
 
 export default function EmpresaDetails() {
   const { id } = useParams();
@@ -24,12 +25,16 @@ export default function EmpresaDetails() {
   const [isSelectAllContext, setIsSelectAllContext] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/empresas`)
-      .then((res) => res.json())
+    fetch(`/api/empresas`, { headers: getAuthHeaders() })
+      .then((res) => {
+        if (!res.ok) throw new Error("Não autorizado");
+        return res.json();
+      })
       .then(data => {
          const found = data.find((e: any) => e.id.toString() === id);
          setEmpresa(found);
-      });
+      })
+      .catch((err) => console.error(err));
   }, [id]);
 
   const carregarNotas = () => {
@@ -45,8 +50,11 @@ export default function EmpresaDetails() {
     if (filtros.modelo) params.append("modelo", filtros.modelo);
     if (filtros.status) params.append("status", filtros.status);
 
-    fetch(`/api/notas?${params.toString()}`)
-      .then((res) => res.json())
+    fetch(`/api/notas?${params.toString()}`, { headers: getAuthHeaders() })
+      .then((res) => {
+        if (!res.ok) throw new Error("Não autorizado");
+        return res.json();
+      })
       .then((data) => {
         setNotas(data.notas || []);
         setTotalNotas(data.total || 0);
@@ -85,9 +93,11 @@ export default function EmpresaDetails() {
   };
 
   const handleDownloadBatch = () => {
+    const tkn = getToken() || '';
     if (isSelectAllContext && totalNotas > 0) {
       const params = new URLSearchParams();
       params.append("empresa_id", id!);
+      params.append("token", tkn);
       if (filtros.data_inicio) params.append("data_inicio", filtros.data_inicio);
       if (filtros.data_fim) params.append("data_fim", filtros.data_fim);
       if (filtros.fornecedor) params.append("fornecedor", filtros.fornecedor);
@@ -96,7 +106,7 @@ export default function EmpresaDetails() {
       if (filtros.status) params.append("status", filtros.status);
       window.open(`/api/download-filter?${params.toString()}`, '_blank');
     } else if (selectedNotas.length > 0) {
-      window.open(`/api/download-batch?ids=${selectedNotas.join(',')}`, '_blank');
+      window.open(`/api/download-batch?ids=${selectedNotas.join(',')}&token=${tkn}`, '_blank');
     }
   };
 

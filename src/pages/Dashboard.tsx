@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { formatCurrency } from "../lib/utils";
 import { ArrowDown, PieChart, BarChart3 } from "lucide-react";
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, BarChart as ReBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { getAuthHeaders } from "../lib/auth";
 
 const COLORS = ['#3b82f6', '#4f46e5', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef'];
 
@@ -9,8 +10,11 @@ export default function Dashboard() {
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    fetch("/api/dashboard")
-      .then((res) => res.json())
+    fetch("/api/dashboard", { headers: getAuthHeaders() })
+      .then((res) => {
+        if (!res.ok) throw new Error("Não autorizado");
+        return res.json();
+      })
       .then(setData)
       .catch((err) => console.error(err));
   }, []);
