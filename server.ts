@@ -144,8 +144,8 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
     await db.run(`
       INSERT INTO notas (
         empresa_id, chave_nfe, fornecedor, cnpj_fornecedor, 
-        data_emissao, valor_total, modelo, caminho_arquivo, tipo, status, hostname
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        data_emissao, valor_total, modelo, caminho_arquivo, tipo, status, hostname, tamanho_arquivo
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       empresa_id,
       chave_nfe,
@@ -157,7 +157,8 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
       `/uploads/empresas/${cnpj_destinatario}/${ano}/${mes}/${chave_nfe}.xml`, // Relative URL path
       tipo || null,
       status || null,
-      hostname || "Desconhecido"
+      hostname || "Desconhecido",
+      file.size || 0
     ]);
 
     res.status(201).json({ success: true, message: "Nota processada com sucesso." });
@@ -214,6 +215,91 @@ app.get("/api/empresas", async (req, res) => {
     res.json(empresas);
   } catch(error) {
     res.status(500).json({ error: "Erro ao buscar empresas." });
+  }
+});
+
+// Storage Info
+function getDirectorySize(dirPath: string): number {
+  let totalSize = 0;
+  if (!fs.existsSync(dirPath)) return 0;
+  const files = fs.readdirSync(dirPath);
+  for (const file of files) {
+    const fullPath = path.join(dirPath, file);
+    const stats = fs.statSync(fullPath);
+    if (stats.isDirectory()) {
+      totalSize += getDirectorySize(fullPath);
+    } else {
+      totalSize += stats.size;
+    }
+  }
+  return totalSize;
+}
+
+app.get("/api/storage", async (req, res) => {
+  try {
+    const dir = path.join(process.cwd(), "uploads", "empresas");
+    const bytes = getDirectorySize(dir);
+    res.json({ bytes });
+  } catch(error) {
+    res.status(500).json({ error: "Erro ao calcular armazenamento." });
+  }
+});
+
+// Delete Notas in batch
+app.delete("/api/notas", async (req, res) => {
+  try {
+    const db = getDB();
+    const { empresa_id, data_inicio, data_fim, tamanho_min, tamanho_max } = req.query;
+
+    let query = "SELECT id, caminho_arquivo FROM notas WHERE 1=1";
+    const params: any[] = [];
+
+    if (empresa_id) {
+      query += " AND empresa_id = ?";
+      params.push(empresa_id);
+    }
+    if (data_inicio) {
+      query += " AND data_emissao >= ?";
+      params.push(data_inicio);
+    }
+    if (data_fim) {
+      query += " AND data_emissao <= ?";
+      params.push(data_fim + 'T23:59:59');
+    }
+    if (tamanho_min) {
+      query += " AND tamanho_arquivo >= ?";
+      params.push(tamanho_min);
+    }
+    if (tamanho_max) {
+      query += " AND tamanho_arquivo <= ?";
+      params.push(tamanho_max);
+    }
+
+    const notasToDelete = await db.all(query, params);
+    let deletedCount = 0;
+
+    for (const nota of notasToDelete) {
+      let relativePath = nota.caminho_arquivo;
+      if (relativePath.startsWith("/uploads/")) {
+        relativePath = relativePath.substring(9);
+      }
+      const fullPath = path.join(uploadDir, relativePath);
+      
+      try {
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+        await db.run("DELETE FROM notas WHERE id = ?", [nota.id]);
+        deletedCount++;
+      } catch (err) {
+        console.error("Error deleting nota ID:", nota.id, err);
+      }
+    }
+
+    res.json({ success: true, deleted: deletedCount });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao excluir notas." });
   }
 });
 
