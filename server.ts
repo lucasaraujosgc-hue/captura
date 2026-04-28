@@ -251,9 +251,10 @@ app.get("/api/dashboard", async (req, res) => {
       SELECT e.nome, e.cnpj, SUM(n.valor_total) as totalFaturamento
       FROM empresas e
       JOIN notas n ON e.id = n.empresa_id
+      WHERE n.tipo = 'Saída'
       GROUP BY e.id
       ORDER BY totalFaturamento DESC
-      LIMIT 6
+      LIMIT 5
     `);
 
     // Top empresas volume de arquivos
@@ -263,14 +264,19 @@ app.get("/api/dashboard", async (req, res) => {
       JOIN notas n ON e.id = n.empresa_id
       GROUP BY e.id
       ORDER BY totalArquivos DESC
-      LIMIT 6
+      LIMIT 5
+    `);
+
+    const empresasLista = await db.all(`
+      SELECT nome, cnpj FROM empresas ORDER BY nome ASC
     `);
 
     res.json({
       total_notas: totalNotas?.count || 0,
       total_empresas: totalEmpresas?.count || 0,
       topFaturamento: topFaturamento || [],
-      topVolume: topVolume || []
+      topVolume: topVolume || [],
+      empresasList: empresasLista || []
     });
   } catch(error) {
     console.error(error);

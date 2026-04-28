@@ -188,12 +188,20 @@ export default function Dashboard() {
               <FileText className="w-5 h-5 text-gray-700" /> CNPJS
             </h2>
           </div>
-          <div className="flex justify-center items-center h-48">
-            <span className="text-gray-500 font-medium">No data found.</span>
-          </div>
-          <div className="flex justify-center items-center h-20">
-            <span className="text-gray-500 font-medium">No data found.</span>
-          </div>
+          {data.empresasList && data.empresasList.length > 0 ? (
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+              {data.empresasList.map((empresa: any) => (
+                <div key={empresa.cnpj} className="flex flex-col gap-1 border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                  <span className="font-semibold text-gray-800 text-sm">{empresa.nome}</span>
+                  <span className="text-xs text-gray-500 font-mono">{empresa.cnpj}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex justify-center items-center h-48">
+              <span className="text-gray-500 font-medium">No data found.</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
