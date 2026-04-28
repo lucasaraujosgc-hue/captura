@@ -74,7 +74,8 @@ app.post('/api/login', (req, res) => {
 });
 
 // Ensure uploads folder exists
-const uploadDir = path.join(process.cwd(), "uploads");
+const isBackupMounted = fs.existsSync('/backup');
+const uploadDir = isBackupMounted ? '/backup/uploads' : path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -237,7 +238,7 @@ function getDirectorySize(dirPath: string): number {
 
 app.get("/api/storage", async (req, res) => {
   try {
-    const dir = path.join(process.cwd(), "uploads", "empresas");
+    const dir = path.join(uploadDir, "empresas");
     const bytes = getDirectorySize(dir);
     res.json({ bytes });
   } catch(error) {
@@ -326,7 +327,7 @@ app.post("/api/empresas", async (req, res) => {
 app.get("/api/notas", async (req, res) => {
   try {
     const db = getDB();
-    const { empresa_id, data_inicio, data_fim, fornecedor, tipo, modelo, status, page = '1', limit = '20' } = req.query;
+    const { empresa_id, data_inicio, data_fim, fornecedor, tipo, modelo, status, tamanho_min, tamanho_max, page = '1', limit = '20' } = req.query;
     
     let baseQuery = `
       FROM notas n
@@ -363,10 +364,21 @@ app.get("/api/notas", async (req, res) => {
       baseQuery += " AND n.status = ?";
       params.push(status);
     }
+    if (tamanho_min) {
+      baseQuery += " AND n.tamanho_arquivo >= ?";
+      params.push(tamanho_min);
+    }
+    if (tamanho_max) {
+      baseQuery += " AND n.tamanho_arquivo <= ?";
+      params.push(tamanho_max);
+    }
 
     // Count total match
     const countRow = await db.get(`SELECT COUNT(*) as total ${baseQuery}`, params);
     const total = countRow ? countRow.total : 0;
+
+    const sumRow = await db.get(`SELECT SUM(tamanho_arquivo) as totalSize ${baseQuery}`, params);
+    const totalSize = sumRow && sumRow.totalSize ? sumRow.totalSize : 0;
 
     const pageNum = parseInt(page as string) || 1;
     const limitNum = parseInt(limit as string) || 20;
@@ -380,6 +392,7 @@ app.get("/api/notas", async (req, res) => {
     res.json({
       notas,
       total,
+      totalSize,
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum)

@@ -6,7 +6,8 @@ import fs from 'fs';
 let dbInstance: Database;
 
 export async function initDB() {
-  const dataDir = path.join(process.cwd(), 'data');
+  const isBackupMounted = fs.existsSync('/backup');
+  const dataDir = isBackupMounted ? '/backup/data' : path.join(process.cwd(), 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }

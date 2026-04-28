@@ -59,7 +59,6 @@ export default function App() {
         <nav className="flex-1 px-4 space-y-2">
           <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
           <NavItem to="/empresas" icon={Building2} label="Empresas" />
-          <NavItem to="/armazenamento" icon={HardDrive} label="Armazenamento" />
         </nav>
         
         {/* Storage Widget Start */}
