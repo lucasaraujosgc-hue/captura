@@ -47,30 +47,30 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
+    <div className="flex h-screen bg-[#f5f7f9] font-sans text-gray-900">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <aside className="w-64 bg-white border-r border-[#e5e9f0] flex flex-col shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10">
         <div className="p-6">
-          <h1 className="text-xl font-bold tracking-tight text-blue-600 flex items-center gap-2">
-            <UploadCloud className="w-6 h-6" />
+          <h1 className="text-xl font-extrabold tracking-tight text-gray-900 flex items-center gap-2">
+            <UploadCloud className="w-6 h-6 text-[#4a72ff]" />
             NFe Automator
           </h1>
         </div>
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-4 space-y-2 mt-2">
           <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
           <NavItem to="/empresas" icon={Building2} label="Empresas" />
         </nav>
         
         {/* Storage Widget Start */}
-        <div className="p-4 mx-4 mb-4 mt-auto rounded-xl border border-gray-100 bg-gray-50 shadow-sm relative overflow-hidden">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Armazenamento</p>
-          <div className="flex items-center gap-2 mb-3">
-            <HardDrive className="w-4 h-4 text-blue-600" />
-            <span className="text-sm text-gray-700">Espaço Usado <strong>{formatBytes(storageBytes)}</strong></span>
+        <div className="p-4 mx-4 mb-4 mt-auto rounded-2xl border border-gray-100 bg-[#f8f9fc] shadow-sm relative overflow-hidden">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">Armazenamento</p>
+          <div className="flex items-center gap-2 mb-4">
+            <HardDrive className="w-4 h-4 text-[#4a72ff]" />
+            <span className="text-sm text-gray-800 font-medium">Espaço Usado <strong>{formatBytes(storageBytes)}</strong></span>
           </div>
           <NavLink
             to="/armazenamento"
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium border border-blue-100 hover:bg-blue-100 transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-[#e8f1ff] text-[#1e5eff] rounded-xl text-sm font-semibold border border-[#d6e5ff] hover:bg-[#dce9ff] transition-colors shadow-sm"
           >
             <ImageIcon className="w-4 h-4" />
             Galeria de Arquivos
@@ -78,10 +78,10 @@ export default function App() {
         </div>
         {/* Storage Widget End */}
 
-        <div className="p-4 border-t border-gray-100">
+        <div className="p-4">
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700 font-medium hover:bg-gray-100 transition-colors"
           >
             <LogOut className="w-5 h-5" />
             Sair
@@ -107,10 +107,10 @@ function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementTyp
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+        `flex items-center gap-3 px-4 py-3 rounded-full transition-all ${
           isActive 
-            ? "bg-blue-50 text-blue-700 font-medium" 
-            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            ? "bg-[#eaf5ff] text-[#026aa2] font-semibold border border-[#7dd3fc] shadow-[0_0_15px_rgba(125,211,252,0.4)]" 
+            : "text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900 border border-transparent"
         }`
       }
     >
