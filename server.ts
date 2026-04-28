@@ -493,12 +493,22 @@ app.get("/api/notas", async (req, res) => {
       params.push('%' + fornecedor + '%');
     }
     if (tipo && typeof tipo === 'string') {
-      baseQuery += " AND n.tipo = ?";
-      params.push(tipo);
+      if (tipo === 'Saída' || tipo === 'Saida') {
+        baseQuery += " AND (n.tipo = 'Saída' OR n.tipo = 'Saida')";
+      } else {
+        baseQuery += " AND n.tipo = ?";
+        params.push(tipo);
+      }
     }
     if (modelo && typeof modelo === 'string') {
-      baseQuery += " AND n.modelo = ?";
-      params.push(modelo);
+      if (modelo === 'NF-e' || modelo === '55') {
+        baseQuery += " AND (n.modelo = '55' OR n.modelo = 'NF-e' OR n.tipo = 'Entrada')";
+      } else if (modelo === 'NFC-e' || modelo === '65') {
+        baseQuery += " AND (n.modelo = '65' OR n.modelo = 'NFC-e') AND n.tipo != 'Entrada'";
+      } else {
+        baseQuery += " AND n.modelo = ?";
+        params.push(modelo);
+      }
     }
     if (status && typeof status === 'string') {
       baseQuery += " AND n.status = ?";

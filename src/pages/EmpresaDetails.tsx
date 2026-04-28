@@ -132,8 +132,8 @@ export default function EmpresaDetails() {
       </div>
 
       {/* Filters Area */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 items-end">
-        <label className="flex flex-col gap-1 col-span-2 xl:col-span-2">
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex overflow-x-auto gap-3 items-end">
+        <label className="flex flex-col gap-1 flex-1 min-w-[200px]">
           <span className="text-[13px] font-medium text-gray-700">Buscar Fornecedor</span>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
@@ -147,10 +147,10 @@ export default function EmpresaDetails() {
           </div>
         </label>
 
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1 shrink-0 w-[110px]">
           <span className="text-[13px] font-medium text-gray-700">Tipo</span>
           <select 
-            className="px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
             value={filtros.tipo}
             onChange={(e) => setFiltros({...filtros, tipo: e.target.value})}
           >
@@ -160,10 +160,10 @@ export default function EmpresaDetails() {
           </select>
         </label>
 
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1 shrink-0 w-[110px]">
           <span className="text-[13px] font-medium text-gray-700">Modelo</span>
           <select 
-            className="px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
             value={filtros.modelo}
             onChange={(e) => setFiltros({...filtros, modelo: e.target.value})}
           >
@@ -173,10 +173,10 @@ export default function EmpresaDetails() {
           </select>
         </label>
 
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1 shrink-0 w-[130px]">
           <span className="text-[13px] font-medium text-gray-700">Status</span>
           <select 
-            className="px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
             value={filtros.status}
             onChange={(e) => setFiltros({...filtros, status: e.target.value})}
           >
@@ -187,7 +187,7 @@ export default function EmpresaDetails() {
           </select>
         </label>
 
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1 shrink-0 w-[140px]">
           <span className="text-[13px] font-medium text-gray-700">Período Inicial</span>
           <div className="relative">
             <Calendar className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
@@ -200,7 +200,7 @@ export default function EmpresaDetails() {
           </div>
         </label>
 
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1 shrink-0 w-[140px]">
           <span className="text-[13px] font-medium text-gray-700">Período Final</span>
           <div className="relative">
             <Calendar className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
@@ -306,7 +306,7 @@ export default function EmpresaDetails() {
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1 items-start">
                       <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700">
-                        {nota.modelo === '55' ? 'NF-e' : 'NFC-e'}
+                        {nota.tipo === 'Entrada' ? 'NF-e' : (nota.modelo === '65' || nota.modelo === 'NFC-e' ? 'NFC-e' : 'NF-e')}
                       </span>
                       {nota.tipo && (
                         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${nota.tipo === 'Entrada' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
