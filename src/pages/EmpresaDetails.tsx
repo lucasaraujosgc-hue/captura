@@ -8,13 +8,20 @@ export default function EmpresaDetails() {
   const { id } = useParams();
   const [empresa, setEmpresa] = useState<any>(null);
   const [notas, setNotas] = useState<any[]>([]);
+  const [totalNotas, setTotalNotas] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
+  
   const [filtros, setFiltros] = useState({
     data_inicio: "",
     data_fim: "",
     fornecedor: "",
-    tipo: ""
+    tipo: "",
+    modelo: "",
+    status: ""
   });
   const [selectedNotas, setSelectedNotas] = useState<number[]>([]);
+  const [isSelectAllContext, setIsSelectAllContext] = useState(false);
 
   useEffect(() => {
     fetch(`/api/empresas`)
@@ -29,26 +36,39 @@ export default function EmpresaDetails() {
     if (!id) return;
     const params = new URLSearchParams();
     params.append("empresa_id", id);
+    params.append("page", page.toString());
+    params.append("limit", "20");
     if (filtros.data_inicio) params.append("data_inicio", filtros.data_inicio);
     if (filtros.data_fim) params.append("data_fim", filtros.data_fim);
     if (filtros.fornecedor) params.append("fornecedor", filtros.fornecedor);
     if (filtros.tipo) params.append("tipo", filtros.tipo);
+    if (filtros.modelo) params.append("modelo", filtros.modelo);
+    if (filtros.status) params.append("status", filtros.status);
 
     fetch(`/api/notas?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => {
-        setNotas(data);
-        setSelectedNotas([]); // Reset selection when filters change
+        setNotas(data.notas || []);
+        setTotalNotas(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+        setSelectedNotas([]); 
+        setIsSelectAllContext(false);
       })
       .catch((err) => console.error(err));
   };
 
   useEffect(() => {
-    carregarNotas();
-  }, [id, filtros]);
+    setPage(1); // Reset page to 1 when filters change
+  }, [filtros]);
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
+  useEffect(() => {
+    carregarNotas();
+  }, [id, filtros, page]);
+
+  const handleSelectAllContext = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setIsSelectAllContext(checked);
+    if (checked) {
       setSelectedNotas(notas.map(n => n.id));
     } else {
       setSelectedNotas([]);
@@ -58,14 +78,26 @@ export default function EmpresaDetails() {
   const handleSelectRow = (notaId: number) => {
     if (selectedNotas.includes(notaId)) {
       setSelectedNotas(selectedNotas.filter(id => id !== notaId));
+      setIsSelectAllContext(false);
     } else {
       setSelectedNotas([...selectedNotas, notaId]);
     }
   };
 
   const handleDownloadBatch = () => {
-    if (selectedNotas.length === 0) return;
-    window.open(`/api/download-batch?ids=${selectedNotas.join(',')}`, '_blank');
+    if (isSelectAllContext && totalNotas > 0) {
+      const params = new URLSearchParams();
+      params.append("empresa_id", id!);
+      if (filtros.data_inicio) params.append("data_inicio", filtros.data_inicio);
+      if (filtros.data_fim) params.append("data_fim", filtros.data_fim);
+      if (filtros.fornecedor) params.append("fornecedor", filtros.fornecedor);
+      if (filtros.tipo) params.append("tipo", filtros.tipo);
+      if (filtros.modelo) params.append("modelo", filtros.modelo);
+      if (filtros.status) params.append("status", filtros.status);
+      window.open(`/api/download-filter?${params.toString()}`, '_blank');
+    } else if (selectedNotas.length > 0) {
+      window.open(`/api/download-batch?ids=${selectedNotas.join(',')}`, '_blank');
+    }
   };
 
   if (!empresa) return <div className="p-8">Carregando dados da empresa...</div>;
@@ -87,8 +119,8 @@ export default function EmpresaDetails() {
       </div>
 
       {/* Filters Area */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <label className="flex flex-col gap-1.5">
+      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <label className="flex flex-col gap-1.5 lg:col-span-2">
           <span className="text-sm font-medium text-gray-700">Buscar Fornecedor</span>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
@@ -112,6 +144,33 @@ export default function EmpresaDetails() {
             <option value="">Todos</option>
             <option value="Entrada">Entrada</option>
             <option value="Saida">Saída</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-gray-700">Modelo</span>
+          <select 
+            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+            value={filtros.modelo}
+            onChange={(e) => setFiltros({...filtros, modelo: e.target.value})}
+          >
+            <option value="">Todos</option>
+            <option value="55">NF-e (55)</option>
+            <option value="65">NFC-e (65)</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-gray-700">Status</span>
+          <select 
+            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+            value={filtros.status}
+            onChange={(e) => setFiltros({...filtros, status: e.target.value})}
+          >
+            <option value="">Todos</option>
+            <option value="Autorizada">Autorizada</option>
+            <option value="Cancelada">Cancelada</option>
+            <option value="Inutilizada">Inutilizada</option>
           </select>
         </label>
 
@@ -144,11 +203,34 @@ export default function EmpresaDetails() {
 
       {/* Actions */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600 font-medium">
-          {notas.length} nota(s) encontrada(s)
+        <p className="text-sm text-gray-600 font-medium whitespace-nowrap">
+          {totalNotas} nota(s) encontrada(s)
         </p>
+        
+        {isSelectAllContext ? (
+          <div className="flex-1 px-4 flex items-center justify-center">
+            <p className="text-sm text-blue-700 bg-blue-50 font-medium px-4 py-1.5 rounded-full border border-blue-100">
+              Todas as <strong>{totalNotas}</strong> notas deste filtro estão selecionadas para baixar.
+            </p>
+          </div>
+        ) : selectedNotas.length > 0 ? (
+          <div className="flex-1 px-4 flex items-center justify-center">
+            <p className="text-sm text-blue-700 bg-blue-50 font-medium px-4 py-1.5 rounded-full border border-blue-100">
+              <strong>{selectedNotas.length}</strong> nota(s) selecionada(s) nesta página. 
+              {totalNotas > selectedNotas.length && (
+                <button 
+                  onClick={() => setIsSelectAllContext(true)}
+                  className="ml-2 underline hover:text-blue-900"
+                >
+                  Selecionar todas as {totalNotas} notas do filtro.
+                </button>
+              )}
+            </p>
+          </div>
+        ) : <div className="flex-1" />}
+
         <button 
-          disabled={selectedNotas.length === 0}
+          disabled={!isSelectAllContext && selectedNotas.length === 0}
           onClick={handleDownloadBatch}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
@@ -167,7 +249,7 @@ export default function EmpresaDetails() {
                   <input 
                     type="checkbox" 
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    onChange={handleSelectAll}
+                    onChange={handleSelectAllContext}
                     checked={notas.length > 0 && selectedNotas.length === notas.length}
                   />
                 </th>
@@ -252,6 +334,53 @@ export default function EmpresaDetails() {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+            <p className="text-sm text-gray-500">
+              Mostrando página <span className="font-medium text-gray-900">{page}</span> de <span className="font-medium text-gray-900">{totalPages}</span>
+            </p>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-white disabled:opacity-50 transition-colors"
+              >
+                Anterior
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }).map((_, idx) => {
+                let p = page - 2 + idx;
+                if (page < 3) p = idx + 1;
+                else if (page > totalPages - 2) p = totalPages - 4 + idx;
+                
+                if (p > 0 && p <= totalPages) {
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-8 py-1 text-sm border rounded transition-colors ${
+                        page === p 
+                          ? 'bg-blue-600 text-white border-blue-600' 
+                          : 'border-gray-300 hover:bg-white'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                }
+                return null;
+              })}
+              <button 
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-white disabled:opacity-50 transition-colors"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

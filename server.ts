@@ -193,14 +193,77 @@ app.post("/api/empresas", async (req, res) => {
 app.get("/api/notas", async (req, res) => {
   try {
     const db = getDB();
-    const { empresa_id, data_inicio, data_fim, fornecedor, tipo } = req.query;
+    const { empresa_id, data_inicio, data_fim, fornecedor, tipo, modelo, status, page = '1', limit = '20' } = req.query;
     
-    let query = `
-      SELECT n.*, e.nome as nome_empresa, e.cnpj as cnpj_empresa
+    let baseQuery = `
       FROM notas n
       JOIN empresas e ON n.empresa_id = e.id
       WHERE 1=1
     `;
+    const params: any[] = [];
+
+    if (empresa_id) {
+      baseQuery += " AND n.empresa_id = ?";
+      params.push(empresa_id);
+    }
+    if (data_inicio) {
+      baseQuery += " AND n.data_emissao >= ?";
+      params.push(data_inicio);
+    }
+    if (data_fim) {
+      baseQuery += " AND n.data_emissao <= ?";
+      params.push(data_fim + 'T23:59:59'); 
+    }
+    if (fornecedor && typeof fornecedor === 'string') {
+      baseQuery += " AND n.fornecedor LIKE ?";
+      params.push('%' + fornecedor + '%');
+    }
+    if (tipo && typeof tipo === 'string') {
+      baseQuery += " AND n.tipo = ?";
+      params.push(tipo);
+    }
+    if (modelo && typeof modelo === 'string') {
+      baseQuery += " AND n.modelo = ?";
+      params.push(modelo);
+    }
+    if (status && typeof status === 'string') {
+      baseQuery += " AND n.status = ?";
+      params.push(status);
+    }
+
+    // Count total match
+    const countRow = await db.get(`SELECT COUNT(*) as total ${baseQuery}`, params);
+    const total = countRow ? countRow.total : 0;
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 20;
+    const offset = (pageNum - 1) * limitNum;
+
+    baseQuery += " ORDER BY n.data_emissao DESC LIMIT ? OFFSET ?";
+    params.push(limitNum, offset);
+
+    const notas = await db.all(`SELECT n.*, e.nome as nome_empresa, e.cnpj as cnpj_empresa ${baseQuery}`, params);
+    
+    res.json({
+      notas,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum)
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao buscar notas." });
+  }
+});
+
+// 5. Download in Lote by Filter
+app.get("/api/download-filter", async (req, res) => {
+  try {
+    const db = getDB();
+    const { empresa_id, data_inicio, data_fim, fornecedor, tipo, modelo, status } = req.query;
+    
+    let query = `SELECT caminho_arquivo, chave_nfe FROM notas n WHERE 1=1`;
     const params: any[] = [];
 
     if (empresa_id) {
@@ -223,18 +286,43 @@ app.get("/api/notas", async (req, res) => {
       query += " AND n.tipo = ?";
       params.push(tipo);
     }
-
-    query += " ORDER BY n.data_emissao DESC LIMIT 100";
+    if (modelo && typeof modelo === 'string') {
+      query += " AND n.modelo = ?";
+      params.push(modelo);
+    }
+    if (status && typeof status === 'string') {
+      query += " AND n.status = ?";
+      params.push(status);
+    }
 
     const notas = await db.all(query, params);
-    res.json(notas);
+
+    if (notas.length === 0) return res.status(404).json({ error: "Nenhuma nota encontrada para os filtros." });
+
+    res.writeHead(200, {
+      'Content-Type': 'application/zip',
+      'Content-disposition': \`attachment; filename=notas_\${Date.now()}.zip\`
+    });
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(res);
+
+    for (const nota of notas) {
+      const filePathRelative = nota.caminho_arquivo.startsWith("/uploads/") ? nota.caminho_arquivo.substring(9) : nota.caminho_arquivo;
+      const fullPath = path.join(uploadDir, filePathRelative);
+      if (fs.existsSync(fullPath)) {
+        archive.file(fullPath, { name: \`\${nota.chave_nfe}.xml\` });
+      }
+    }
+
+    await archive.finalize();
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Erro ao buscar notas." });
+    if (!res.headersSent) res.status(500).json({ error: "Erro ao gerar arquivo zip." });
   }
 });
 
-// 5. Download in Lote
+// 6. Download in Lote (by IDs - keeping for backward compatibility if needed)
 app.get("/api/download-batch", async (req, res) => {
   try {
     const db = getDB();
