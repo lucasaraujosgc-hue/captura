@@ -134,24 +134,33 @@ app.get("/api/dashboard", async (req, res) => {
   try {
     const db = getDB();
     const totalNotas = await db.get("SELECT COUNT(*) as count FROM notas");
-    const totalValor = await db.get("SELECT SUM(valor_total) as sum FROM notas");
     const totalEmpresas = await db.get("SELECT COUNT(*) as count FROM empresas");
     
-    // Group by month
-    const porCompetencia = await db.all(`
-      SELECT strftime('%Y-%m', data_emissao) as mes, COUNT(*) as qtd, SUM(valor_total) as valor
-      FROM notas
-      WHERE data_emissao IS NOT NULL
-      GROUP BY strftime('%Y-%m', data_emissao)
-      ORDER BY mes DESC
+    // Top empresas faturamento
+    const topFaturamento = await db.all(`
+      SELECT e.nome, e.cnpj, SUM(n.valor_total) as totalFaturamento
+      FROM empresas e
+      JOIN notas n ON e.id = n.empresa_id
+      GROUP BY e.id
+      ORDER BY totalFaturamento DESC
+      LIMIT 6
+    `);
+
+    // Top empresas volume de arquivos
+    const topVolume = await db.all(`
+      SELECT e.nome, e.cnpj, COUNT(n.id) as totalArquivos
+      FROM empresas e
+      JOIN notas n ON e.id = n.empresa_id
+      GROUP BY e.id
+      ORDER BY totalArquivos DESC
       LIMIT 6
     `);
 
     res.json({
       total_notas: totalNotas?.count || 0,
-      total_valor: totalValor?.sum || 0,
       total_empresas: totalEmpresas?.count || 0,
-      competencias: porCompetencia || []
+      topFaturamento: topFaturamento || [],
+      topVolume: topVolume || []
     });
   } catch(error) {
     console.error(error);

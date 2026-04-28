@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Building2, Plus, Copy, Check, ArrowRight } from "lucide-react";
+import { Building2, Plus, Copy, Check, ArrowRight, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function Empresas() {
@@ -8,6 +8,7 @@ export default function Empresas() {
   const [nome, setNome] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [copyingToken, setCopyingToken] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const carregarEmpresas = () => {
     fetch("/api/empresas")
@@ -21,6 +22,7 @@ export default function Empresas() {
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
+    // ... rest is same
     e.preventDefault();
     try {
       const res = await fetch("/api/empresas", {
@@ -48,24 +50,41 @@ export default function Empresas() {
     setTimeout(() => setCopyingToken(null), 2000);
   };
 
+  const empresasFiltradas = empresas.filter(emp => 
+    emp.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    emp.cnpj.includes(searchTerm)
+  );
+
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
-      <header className="flex justify-between items-end">
+      <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Empresas</h1>
           <p className="text-gray-500 mt-1">Gerencie suas empresas e acesse os XMLs de forma isolada.</p>
         </div>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Nova Empresa
-        </button>
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+            <input 
+              type="text" 
+              placeholder="Buscar empresa..."
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button 
+            onClick={() => setShowModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2 whitespace-nowrap"
+          >
+            <Plus className="w-5 h-5" />
+            Nova Empresa
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {empresas.map((emp) => (
+        {empresasFiltradas.map((emp) => (
           <div key={emp.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
             <div className="p-6 flex-1">
               <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4">
