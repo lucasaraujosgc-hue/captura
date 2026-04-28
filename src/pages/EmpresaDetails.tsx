@@ -132,51 +132,51 @@ export default function EmpresaDetails() {
       </div>
 
       {/* Filters Area */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <label className="flex flex-col gap-1.5 lg:col-span-2">
-          <span className="text-sm font-medium text-gray-700">Buscar Fornecedor</span>
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 items-end">
+        <label className="flex flex-col gap-1 col-span-2 xl:col-span-2">
+          <span className="text-[13px] font-medium text-gray-700">Buscar Fornecedor</span>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
             <input 
               type="text" 
               placeholder="Ex: Coca Cola..."
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
               value={filtros.fornecedor}
               onChange={(e) => setFiltros({...filtros, fornecedor: e.target.value})}
             />
           </div>
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Tipo</span>
+        <label className="flex flex-col gap-1">
+          <span className="text-[13px] font-medium text-gray-700">Tipo</span>
           <select 
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+            className="px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
             value={filtros.tipo}
             onChange={(e) => setFiltros({...filtros, tipo: e.target.value})}
           >
             <option value="">Todos</option>
             <option value="Entrada">Entrada</option>
-            <option value="Saida">Saída</option>
+            <option value="Saída">Saída</option>
           </select>
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Modelo</span>
+        <label className="flex flex-col gap-1">
+          <span className="text-[13px] font-medium text-gray-700">Modelo</span>
           <select 
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+            className="px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
             value={filtros.modelo}
             onChange={(e) => setFiltros({...filtros, modelo: e.target.value})}
           >
             <option value="">Todos</option>
-            <option value="55">NF-e (55)</option>
-            <option value="65">NFC-e (65)</option>
+            <option value="NF-e">NF-e (55)</option>
+            <option value="NFC-e">NFC-e (65)</option>
           </select>
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Status</span>
+        <label className="flex flex-col gap-1">
+          <span className="text-[13px] font-medium text-gray-700">Status</span>
           <select 
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+            className="px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm bg-white"
             value={filtros.status}
             onChange={(e) => setFiltros({...filtros, status: e.target.value})}
           >
@@ -187,26 +187,26 @@ export default function EmpresaDetails() {
           </select>
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Período Inicial</span>
+        <label className="flex flex-col gap-1">
+          <span className="text-[13px] font-medium text-gray-700">Período Inicial</span>
           <div className="relative">
-            <Calendar className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+            <Calendar className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
             <input 
               type="date"
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full pl-8 pr-2 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
               value={filtros.data_inicio}
               onChange={(e) => setFiltros({...filtros, data_inicio: e.target.value})}
             />
           </div>
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Período Final</span>
+        <label className="flex flex-col gap-1">
+          <span className="text-[13px] font-medium text-gray-700">Período Final</span>
           <div className="relative">
-            <Calendar className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+            <Calendar className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
             <input 
               type="date"
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full pl-8 pr-2 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
               value={filtros.data_fim}
               onChange={(e) => setFiltros({...filtros, data_fim: e.target.value})}
             />
