@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Building2, Plus, Copy, Check, ArrowRight, Search } from "lucide-react";
+import { Building2, Plus, Copy, Check, ArrowRight, Search, Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getAuthHeaders } from "../lib/auth";
 
 export default function Empresas() {
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [nome, setNome] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [copyingToken, setCopyingToken] = useState<string | null>(null);
@@ -25,26 +26,65 @@ export default function Empresas() {
     carregarEmpresas();
   }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    // ... rest is same
+  const openCreateModal = () => {
+    setEditingId(null);
+    setNome("");
+    setCnpj("");
+    setShowModal(true);
+  };
+
+  const openEditModal = (emp: any) => {
+    setEditingId(emp.id);
+    setNome(emp.nome);
+    setCnpj(emp.cnpj);
+    setShowModal(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/empresas", {
-        method: "POST",
+      const isEditing = editingId !== null;
+      const url = isEditing ? `/api/empresas/${editingId}` : "/api/empresas";
+      const method = isEditing ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { 
           "Content-Type": "application/json",
           ...getAuthHeaders() 
         },
         body: JSON.stringify({ nome, cnpj })
       });
+
       if (res.ok) {
         setShowModal(false);
         setNome("");
         setCnpj("");
+        setEditingId(null);
         carregarEmpresas();
       } else {
         const err = await res.json();
-        alert(err.error || "Erro ao criar empresa.");
+        alert(err.error || "Erro ao salvar empresa.");
+      }
+    } catch (e) {
+      alert("Erro ao conectar com o servidor.");
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Deseja realmente excluir esta empresa e todas as suas notas associadas? Essa ação não pode ser desfeita.")) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/empresas/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders()
+      });
+      if (res.ok) {
+        carregarEmpresas();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Erro ao excluir empresa.");
       }
     } catch (e) {
       alert("Erro ao conectar com o servidor.");
@@ -81,7 +121,7 @@ export default function Empresas() {
             />
           </div>
           <button 
-            onClick={() => setShowModal(true)}
+            onClick={openCreateModal}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2 whitespace-nowrap"
           >
             <Plus className="w-5 h-5" />
@@ -94,8 +134,18 @@ export default function Empresas() {
         {empresasFiltradas.map((emp) => (
           <div key={emp.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
             <div className="p-6 flex-1">
-              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4">
-                <Building2 className="w-6 h-6" />
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                  <Building2 className="w-6 h-6" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => openEditModal(emp)} className="p-1.5 text-gray-500 hover:text-blue-600 transition-colors" title="Editar Empresa">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete(emp.id)} className="p-1.5 text-gray-500 hover:text-red-600 transition-colors" title="Excluir Empresa">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <h2 className="text-lg font-bold text-gray-900 line-clamp-1" title={emp.nome}>{emp.nome}</h2>
               <p className="text-sm text-gray-500 mt-1">CNPJ: {emp.cnpj}</p>
@@ -140,10 +190,10 @@ export default function Empresas() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="font-bold text-lg text-gray-900">Cadastrar Empresa</h3>
+              <h3 className="font-bold text-lg text-gray-900">{editingId ? "Editar Empresa" : "Cadastrar Empresa"}</h3>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
             </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
+            <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Razão Social</label>
                 <input 

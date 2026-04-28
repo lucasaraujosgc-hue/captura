@@ -89,7 +89,7 @@ const _tmpUpload = multer({ dest: path.join(uploadDir, 'tmp') });
 import { XMLParser } from "fast-xml-parser";
 
 // Helper to remove punctuation from CNPJ
-const cleanCnpj = (str: string) => str ? str.replace(/[^\d]+/g, '') : "";
+const cleanCnpj = (str: any) => str ? String(str).replace(/[^\d]+/g, '') : "";
 
 app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, res) => {
   try {
@@ -105,6 +105,7 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
     const parser = new XMLParser({
       ignoreAttributes: false,
       removeNSPrefix: true,
+      parseTagValue: false,
     });
     const jsonObj = parser.parse(xmlData);
 
@@ -427,6 +428,38 @@ app.post("/api/empresas", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erro ao cadastrar empresa." });
+  }
+});
+
+app.put("/api/empresas/:id", async (req, res) => {
+  try {
+    const db = getDB();
+    const { nome, cnpj } = req.body;
+    if (!nome || !cnpj) return res.status(400).json({ error: "Nome e CNPJ são obrigatórios." });
+
+    const check = await db.get("SELECT id FROM empresas WHERE cnpj = ? AND id != ?", [cnpj, req.params.id]);
+    if (check) return res.status(400).json({ error: "Outra empresa com este CNPJ já existe." });
+
+    await db.run("UPDATE empresas SET nome = ?, cnpj = ? WHERE id = ?", [nome, cnpj, req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao atualizar empresa." });
+  }
+});
+
+app.delete("/api/empresas/:id", async (req, res) => {
+  try {
+    const db = getDB();
+    
+    // As notas should ideally be cascaded or checked
+    await db.run("DELETE FROM notas WHERE empresa_id = ?", [req.params.id]);
+    await db.run("DELETE FROM empresas WHERE id = ?", [req.params.id]);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao excluir empresa." });
   }
 });
 
