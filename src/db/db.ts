@@ -47,6 +47,7 @@ export async function initDB() {
   try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN status TEXT;"); } catch (e) {}
   try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN hostname TEXT;"); } catch (e) {}
   try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN tamanho_arquivo INTEGER;"); } catch (e) {}
+  try { await dbInstance.exec("ALTER TABLE notas ADD COLUMN cfop TEXT;"); } catch (e) {}
 }
 
 export function getDB() {

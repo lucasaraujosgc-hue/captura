@@ -186,6 +186,15 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
     if (!valor_total && req.body.valor_total) valor_total = req.body.valor_total;
     const hostname = req.body.hostname || req.body.computador || "Desconhecido";
 
+    let cfop = "";
+    if (nfe?.det) {
+      if (Array.isArray(nfe.det) && nfe.det.length > 0 && nfe.det[0].prod) {
+        cfop = String(nfe.det[0].prod.CFOP || "");
+      } else if (nfe.det.prod) {
+        cfop = String(nfe.det.prod.CFOP || "");
+      }
+    }
+
     // Check if duplicate
     const checkDupe = await db.get("SELECT * FROM notas WHERE chave_nfe = ?", [chave_nfe]);
     if (checkDupe) {
@@ -216,8 +225,8 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
     await db.run(`
       INSERT INTO notas (
         empresa_id, chave_nfe, fornecedor, cnpj_fornecedor, 
-        data_emissao, valor_total, modelo, caminho_arquivo, tipo, status, hostname, tamanho_arquivo
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        data_emissao, valor_total, modelo, caminho_arquivo, tipo, status, hostname, tamanho_arquivo, cfop
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       empresa_id,
       chave_nfe,
@@ -230,7 +239,8 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
       tipo || null,
       status || null,
       hostname,
-      file.size || 0
+      file.size || 0,
+      cfop
     ]);
 
     res.status(201).json({ success: true, message: "Nota processada com sucesso." });
@@ -244,7 +254,25 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
 app.get("/api/dashboard", async (req, res) => {
   try {
     const db = getDB();
-    const totalNotas = await db.get("SELECT COUNT(*) as count FROM notas");
+    const { ano, mes } = req.query;
+
+    let dateFilterNotas = "";
+    let dateFilterNotasWhere = "";
+    const params: any[] = [];
+    
+    if (ano) {
+      if (mes) {
+        dateFilterNotasWhere = "WHERE strftime('%Y-%m', data_emissao) = ?";
+        dateFilterNotas = "AND strftime('%Y-%m', n.data_emissao) = ?";
+        params.push(`${ano}-${String(mes).padStart(2, '0')}`);
+      } else {
+        dateFilterNotasWhere = "WHERE strftime('%Y', data_emissao) = ?";
+        dateFilterNotas = "AND strftime('%Y', n.data_emissao) = ?";
+        params.push(`${ano}`);
+      }
+    }
+
+    const totalNotas = await db.get(`SELECT COUNT(*) as count FROM notas ${dateFilterNotasWhere}`, params);
     const totalEmpresas = await db.get("SELECT COUNT(*) as count FROM empresas");
     
     // Top empresas faturamento
@@ -252,21 +280,22 @@ app.get("/api/dashboard", async (req, res) => {
       SELECT e.nome, e.cnpj, SUM(n.valor_total) as totalFaturamento
       FROM empresas e
       JOIN notas n ON e.id = n.empresa_id
-      WHERE n.tipo = 'Saída'
+      WHERE (n.tipo = 'Saída' OR n.tipo = 'Saida') ${dateFilterNotas}
       GROUP BY e.id
       ORDER BY totalFaturamento DESC
       LIMIT 5
-    `);
+    `, params);
 
     // Top empresas volume de arquivos
     const topVolume = await db.all(`
       SELECT e.nome, e.cnpj, COUNT(n.id) as totalArquivos
       FROM empresas e
       JOIN notas n ON e.id = n.empresa_id
+      WHERE 1=1 ${dateFilterNotas}
       GROUP BY e.id
       ORDER BY totalArquivos DESC
       LIMIT 5
-    `);
+    `, params);
 
     const empresasLista = await db.all(`
       SELECT nome, cnpj FROM empresas ORDER BY nome ASC
@@ -523,11 +552,33 @@ app.get("/api/relatorios/:empresa_id", async (req, res) => {
     `;
     const topClientes = await db.all(topClientesQuery, params);
 
+    const topCfopsEntradaQuery = `
+      SELECT cfop as nome, SUM(valor_total) as valor
+      FROM notas
+      WHERE empresa_id = ? AND tipo = 'Entrada' AND cfop IS NOT NULL AND cfop != '' ${dateFilter}
+      GROUP BY cfop
+      ORDER BY valor DESC
+      LIMIT 10
+    `;
+    const topCfopsEntrada = await db.all(topCfopsEntradaQuery, params);
+
+    const topCfopsSaidaQuery = `
+      SELECT cfop as nome, SUM(valor_total) as valor
+      FROM notas
+      WHERE empresa_id = ? AND (tipo = 'Saída' OR tipo = 'Saida') AND cfop IS NOT NULL AND cfop != '' ${dateFilter}
+      GROUP BY cfop
+      ORDER BY valor DESC
+      LIMIT 10
+    `;
+    const topCfopsSaida = await db.all(topCfopsSaidaQuery, params);
+
     res.json({
       totais: totais || { total_entrada: 0, total_saida: 0, count_entrada: 0, count_saida: 0 },
       mensal: mensal || [],
       topFornecedores: topFornecedores || [],
-      topClientes: topClientes || []
+      topClientes: topClientes || [],
+      topCfopsEntrada: topCfopsEntrada || [],
+      topCfopsSaida: topCfopsSaida || []
     });
 
   } catch(error) {

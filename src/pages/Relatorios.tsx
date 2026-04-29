@@ -271,6 +271,64 @@ export default function Relatorios() {
             </div>
             
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Top CFOPs Entrada */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+              <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
+                Top 10 CFOPs (Despesa/Entrada)
+              </h3>
+              {(!reportData.topCfopsEntrada || reportData.topCfopsEntrada.length === 0) ? (
+                 <p className="text-gray-500 text-sm py-4">Nenhum dado encontrado.</p>
+              ) : (
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportData.topCfopsEntrada} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
+                      <XAxis type="number" tickFormatter={(value) => `R$ ${(value / 1000)}k`} tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis dataKey="nome" type="category" tick={{ fill: '#374151', fontSize: 13, fontWeight: 500 }} axisLine={false} tickLine={false} width={60} />
+                      <Tooltip 
+                        formatter={(value: number) => formatCurrency(value)}
+                        labelFormatter={(label) => `CFOP: ${label}`}
+                        cursor={{fill: '#f3f4f6'}}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}
+                      />
+                      <Bar dataKey="valor" name="Valor (Entrada)" fill="#f97316" radius={[0, 4, 4, 0]} maxBarSize={30} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            {/* Top CFOPs Saida */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+              <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
+                Top 10 CFOPs (Faturamento/Saída)
+              </h3>
+              {(!reportData.topCfopsSaida || reportData.topCfopsSaida.length === 0) ? (
+                 <p className="text-gray-500 text-sm py-4">Nenhum dado encontrado.</p>
+              ) : (
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportData.topCfopsSaida} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
+                      <XAxis type="number" tickFormatter={(value) => `R$ ${(value / 1000)}k`} tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis dataKey="nome" type="category" tick={{ fill: '#374151', fontSize: 13, fontWeight: 500 }} axisLine={false} tickLine={false} width={60} />
+                      <Tooltip 
+                        formatter={(value: number) => formatCurrency(value)}
+                        labelFormatter={(label) => `CFOP: ${label}`}
+                        cursor={{fill: '#f3f4f6'}}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}
+                      />
+                      <Bar dataKey="valor" name="Valor (Saída)" fill="#3b82f6" radius={[0, 4, 4, 0]} maxBarSize={30} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+            
+          </div>
           
         </div>
       )}
