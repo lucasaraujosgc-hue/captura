@@ -463,7 +463,78 @@ app.delete("/api/empresas/:id", async (req, res) => {
   }
 });
 
-// 4. Fetch Notas (with filters)
+app.get("/api/relatorios/:empresa_id", async (req, res) => {
+  try {
+    const db = getDB();
+    const { empresa_id } = req.params;
+    const { start, end } = req.query; // 'YYYY-MM-DD'
+
+    let dateFilter = "";
+    const params: any[] = [empresa_id];
+    if (start && end) {
+      dateFilter = "AND data_emissao >= ? AND data_emissao <= ?";
+      params.push(start, end);
+    }
+
+    // Totals
+    const totaisQuery = `
+      SELECT 
+        SUM(CASE WHEN tipo = 'Entrada' THEN valor_total ELSE 0 END) as total_entrada,
+        SUM(CASE WHEN tipo = 'Saída' OR tipo = 'Saida' THEN valor_total ELSE 0 END) as total_saida,
+        COUNT(CASE WHEN tipo = 'Entrada' THEN 1 END) as count_entrada,
+        COUNT(CASE WHEN tipo = 'Saída' OR tipo = 'Saida' THEN 1 END) as count_saida
+      FROM notas 
+      WHERE empresa_id = ? ${dateFilter}
+    `;
+    const totais = await db.get(totaisQuery, params);
+
+    // Mensal Evolution
+    const mensalQuery = `
+      SELECT 
+        strftime('%Y-%m', data_emissao) as mes,
+        SUM(CASE WHEN tipo = 'Entrada' THEN valor_total ELSE 0 END) as entrada,
+        SUM(CASE WHEN tipo = 'Saída' OR tipo = 'Saida' THEN valor_total ELSE 0 END) as saida
+      FROM notas 
+      WHERE empresa_id = ? ${dateFilter}
+      GROUP BY strftime('%Y-%m', data_emissao)
+      ORDER BY mes ASC
+    `;
+    const mensal = await db.all(mensalQuery, params);
+
+    // Top Fornecedores (Entrada)
+    const topFornecedoresQuery = `
+      SELECT fornecedor as nome, SUM(valor_total) as valor
+      FROM notas
+      WHERE empresa_id = ? AND tipo = 'Entrada' ${dateFilter}
+      GROUP BY fornecedor
+      ORDER BY valor DESC
+      LIMIT 10
+    `;
+    const topFornecedores = await db.all(topFornecedoresQuery, params);
+
+    // Top Clientes (Saída)
+    const topClientesQuery = `
+      SELECT fornecedor as nome, SUM(valor_total) as valor
+      FROM notas
+      WHERE empresa_id = ? AND (tipo = 'Saída' OR tipo = 'Saida') ${dateFilter}
+      GROUP BY fornecedor
+      ORDER BY valor DESC
+      LIMIT 10
+    `;
+    const topClientes = await db.all(topClientesQuery, params);
+
+    res.json({
+      totais: totais || { total_entrada: 0, total_saida: 0, count_entrada: 0, count_saida: 0 },
+      mensal: mensal || [],
+      topFornecedores: topFornecedores || [],
+      topClientes: topClientes || []
+    });
+
+  } catch(error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao gerar relatorio" });
+  }
+});
 app.get("/api/notas", async (req, res) => {
   try {
     const db = getDB();

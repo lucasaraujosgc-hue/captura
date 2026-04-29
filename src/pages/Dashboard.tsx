@@ -7,17 +7,20 @@ import { getAuthHeaders } from "../lib/auth";
 const COLORS = ['#3b82f6', '#4f46e5', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef'];
 
 export default function Dashboard() {
+  const currentDate = new Date();
   const [data, setData] = useState<any>(null);
+  const [ano, setAno] = useState(currentDate.getFullYear().toString());
+  const [mes, setMes] = useState((currentDate.getMonth() + 1).toString().padStart(2, '0'));
 
   useEffect(() => {
-    fetch("/api/dashboard", { headers: getAuthHeaders() })
+    fetch(`/api/dashboard?ano=${ano}&mes=${mes}`, { headers: getAuthHeaders() })
       .then((res) => {
         if (!res.ok) throw new Error("Não autorizado");
         return res.json();
       })
       .then(setData)
       .catch((err) => console.error(err));
-  }, []);
+  }, [ano, mes]);
 
   if (!data) {
     return <div className="p-8 text-center text-gray-500">Carregando dashboard...</div>;
@@ -42,6 +45,46 @@ export default function Dashboard() {
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       
+      {/* Header and Filter */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-gray-100 mb-6">
+        <h1 className="text-xl font-bold text-gray-900">Visão Geral</h1>
+        
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            Competência:
+            <select
+              value={mes}
+              onChange={(e) => setMes(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="">Anual</option>
+              <option value="01">Janeiro</option>
+              <option value="02">Fevereiro</option>
+              <option value="03">Março</option>
+              <option value="04">Abril</option>
+              <option value="05">Maio</option>
+              <option value="06">Junho</option>
+              <option value="07">Julho</option>
+              <option value="08">Agosto</option>
+              <option value="09">Setembro</option>
+              <option value="10">Outubro</option>
+              <option value="11">Novembro</option>
+              <option value="12">Dezembro</option>
+            </select>
+          </label>
+          <select
+            value={ano}
+            onChange={(e) => setAno(e.target.value)}
+            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+          </select>
+        </div>
+      </div>
+
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-[#eaf4ff] p-6 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-[#dcecfc] relative flex justify-between items-start">

@@ -12,6 +12,7 @@ import Notas from "./pages/Notas";
 import EmpresaDetails from "./pages/EmpresaDetails";
 import Login from "./pages/Login";
 import Armazenamento from "./pages/Armazenamento";
+import Relatorios from "./pages/Relatorios";
 import { getToken, logout, getAuthHeaders } from "./lib/auth";
 
 export default function App() {
@@ -59,6 +60,7 @@ export default function App() {
         <nav className="flex-1 px-4 space-y-2 mt-2">
           <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
           <NavItem to="/empresas" icon={Building2} label="Empresas" />
+          <NavItem to="/relatorios" icon={FileText} label="Relatórios" />
         </nav>
         
         {/* Storage Widget Start */}
@@ -95,6 +97,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/empresas" element={<Empresas />} />
           <Route path="/empresas/:id" element={<EmpresaDetails />} />
+          <Route path="/relatorios" element={<Relatorios />} />
           <Route path="/armazenamento" element={<Armazenamento />} />
         </Routes>
       </main>
