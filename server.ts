@@ -196,10 +196,10 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
     }
 
     // Check if duplicate
-    const checkDupe = await db.get("SELECT * FROM notas WHERE chave_nfe = ?", [chave_nfe]);
+    const checkDupe = await db.get("SELECT * FROM notas WHERE chave_nfe = ? AND empresa_id = ?", [chave_nfe, empresa_id]);
     if (checkDupe) {
       fs.unlinkSync(file.path); // remove tmp
-      return res.status(409).json({ error: "XML já processado." });
+      return res.status(409).json({ error: "XML já processado para esta empresa." });
     }
 
     // Determine final path: /uploads/empresa/CNPJ/ANO/MES/CHAVE.xml
@@ -220,28 +220,71 @@ app.post("/api/upload", authMiddleware, _tmpUpload.single("file"), async (req, r
 
     const finalFilePath = path.join(finalPathDir, `${chave_nfe}.xml`);
     fs.renameSync(file.path, finalFilePath);
+    const finalUrlPath = `/uploads/empresas/${cnpj_empresa}/${ano}/${mes}/${chave_nfe}.xml`;
 
     // Save into DB
-    await db.run(`
-      INSERT INTO notas (
-        empresa_id, chave_nfe, fornecedor, cnpj_fornecedor, 
-        data_emissao, valor_total, modelo, caminho_arquivo, tipo, status, hostname, tamanho_arquivo, cfop
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      empresa_id,
-      chave_nfe,
-      nome_fornecedor || "Desconhecido",
-      cnpj_fornecedor || "000",
-      data_emissao || null,
-      parseFloat(valor_total) || 0.0,
-      modelo,
-      `/uploads/empresas/${cnpj_empresa}/${ano}/${mes}/${chave_nfe}.xml`, // Relative URL path
-      tipo || null,
-      status || null,
-      hostname,
-      file.size || 0,
-      cfop
-    ]);
+    try {
+      await db.run(`
+        INSERT INTO notas (
+          empresa_id, chave_nfe, fornecedor, cnpj_fornecedor, 
+          data_emissao, valor_total, modelo, caminho_arquivo, tipo, status, hostname, tamanho_arquivo, cfop
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        empresa_id,
+        chave_nfe,
+        nome_fornecedor || "Desconhecido",
+        cnpj_fornecedor || "000",
+        data_emissao || null,
+        parseFloat(valor_total) || 0.0,
+        modelo,
+        finalUrlPath,
+        tipo || null,
+        status || null,
+        hostname,
+        file.size || 0,
+        cfop
+      ]);
+
+      // --- Espelhamento (Mirroring) ---
+      if (cnpj_fornecedor) {
+        const empresaDestino = await db.get("SELECT id, nome, cnpj FROM empresas WHERE cnpj = ?", [cnpj_fornecedor]);
+        if (empresaDestino) {
+          const checkDupeDestino = await db.get("SELECT * FROM notas WHERE chave_nfe = ? AND empresa_id = ?", [chave_nfe, empresaDestino.id]);
+          if (!checkDupeDestino) {
+            let tipoMirrored = "Desconhecido";
+            if (tipo === "Entrada") tipoMirrored = "Saída";
+            if (tipo === "Saída" || tipo === "Saida") tipoMirrored = "Entrada";
+
+            await db.run(`
+              INSERT INTO notas (
+                empresa_id, chave_nfe, fornecedor, cnpj_fornecedor, 
+                data_emissao, valor_total, modelo, caminho_arquivo, tipo, status, hostname, tamanho_arquivo, cfop
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+              empresaDestino.id,
+              chave_nfe,
+              nome_empresa || "Desconhecido",
+              cnpj_empresa || "000",
+              data_emissao || null,
+              parseFloat(valor_total) || 0.0,
+              modelo,
+              finalUrlPath, // Aponta para o mesmo arquivo (armazenamento compartilhado)
+              tipoMirrored,
+              status || null,
+              hostname,
+              file.size || 0,
+              cfop
+            ]);
+          }
+        }
+      }
+
+    } catch (dbError: any) {
+      if (dbError.code === 'SQLITE_CONSTRAINT') {
+        return res.status(409).json({ error: "XML já processado (concorrente)." });
+      }
+      throw dbError;
+    }
 
     res.status(201).json({ success: true, message: "Nota processada com sucesso." });
   } catch (error) {
@@ -262,13 +305,13 @@ app.get("/api/dashboard", async (req, res) => {
     
     if (ano) {
       if (mes) {
-        dateFilterNotasWhere = "WHERE strftime('%Y-%m', data_emissao) = ?";
-        dateFilterNotas = "AND strftime('%Y-%m', n.data_emissao) = ?";
-        params.push(`${ano}-${String(mes).padStart(2, '0')}`);
+        dateFilterNotasWhere = "WHERE data_emissao LIKE ?";
+        dateFilterNotas = "AND n.data_emissao LIKE ?";
+        params.push(`${ano}-${String(mes).padStart(2, '0')}%`);
       } else {
-        dateFilterNotasWhere = "WHERE strftime('%Y', data_emissao) = ?";
-        dateFilterNotas = "AND strftime('%Y', n.data_emissao) = ?";
-        params.push(`${ano}`);
+        dateFilterNotasWhere = "WHERE data_emissao LIKE ?";
+        dateFilterNotas = "AND n.data_emissao LIKE ?";
+        params.push(`${ano}-%`);
       }
     }
 
