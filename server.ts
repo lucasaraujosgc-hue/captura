@@ -787,8 +787,14 @@ app.get("/api/download-filter", async (req, res) => {
   }
 });
 
-// 6. Download in Lote (by IDs - keeping for backward compatibility if needed)
+// 6. Download Agente (by URL or Path)
 app.get("/api/download-agente", (req, res) => {
+  // Use the external URL if provided in the environment variable
+  if (process.env.DOWNLOAD_AGENTE_URL) {
+    console.log("Redirecionando para link externo configurado no .env:", process.env.DOWNLOAD_AGENTE_URL);
+    return res.redirect(process.env.DOWNLOAD_AGENTE_URL);
+  }
+
   const possiblePaths = [
     "/volumes/backup/Instalador_AgenteNFe.exe",
     "/backup/Instalador_AgenteNFe.exe",
