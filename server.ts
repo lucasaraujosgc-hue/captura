@@ -790,15 +790,24 @@ app.get("/api/download-filter", async (req, res) => {
 // 6. Download in Lote (by IDs - keeping for backward compatibility if needed)
 app.get("/api/download-agente", (req, res) => {
   const possiblePaths = [
+    "/volumes/backup/Instalador_AgenteNFe.exe",
     "/backup/Instalador_AgenteNFe.exe",
-    "/etc/easypanel/projects/pm/captura/volumes/backup/Instalador_AgenteNFe.exe", // Exact path provided by user
+    "/app/backup/Instalador_AgenteNFe.exe",
+    "/app/volumes/backup/Instalador_AgenteNFe.exe",
+    "/etc/easypanel/projects/pm/captura/volumes/backup/Instalador_AgenteNFe.exe",
+    path.join(process.cwd(), "backup", "Instalador_AgenteNFe.exe"),
+    path.join(process.cwd(), "volumes", "backup", "Instalador_AgenteNFe.exe"),
+    path.join(process.cwd(), "agente_local", "Instalador_AgenteNFe.exe"),
     path.join(process.cwd(), "public", "Instalador_AgenteNFe.exe"),
     path.join(process.cwd(), "Instalador_AgenteNFe.exe")
   ];
 
+  console.log("Tentando baixar instalador. Procurando em:");
   let filePath = "";
   for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
+    const exists = fs.existsSync(p);
+    console.log(`- ${p}: ${exists ? "ENCONTRADO" : "NÃO EXISTE"}`);
+    if (exists) {
       filePath = p;
       break;
     }
@@ -807,7 +816,12 @@ app.get("/api/download-agente", (req, res) => {
   if (filePath) {
     res.download(filePath, "Instalador_AgenteNFe.exe");
   } else {
-    res.status(404).json({ error: "Arquivo instalador não encontrado no servidor." });
+    res.status(404).json({ 
+      error: "Arquivo instalador não encontrado no servidor.",
+      message: "Verifique se o volume foi montado corretamente no Easypanel/Docker.",
+      helper: "O arquivo deve estar acessível dentro do container em um destes caminhos.",
+      tried: possiblePaths
+    });
   }
 });
 
