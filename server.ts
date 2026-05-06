@@ -788,6 +788,29 @@ app.get("/api/download-filter", async (req, res) => {
 });
 
 // 6. Download in Lote (by IDs - keeping for backward compatibility if needed)
+app.get("/api/download-agente", (req, res) => {
+  const possiblePaths = [
+    "/backup/Instalador_AgenteNFe.exe",
+    "/etc/easypanel/projects/pm/captura/volumes/backup/Instalador_AgenteNFe.exe", // Exact path provided by user
+    path.join(process.cwd(), "public", "Instalador_AgenteNFe.exe"),
+    path.join(process.cwd(), "Instalador_AgenteNFe.exe")
+  ];
+
+  let filePath = "";
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      filePath = p;
+      break;
+    }
+  }
+
+  if (filePath) {
+    res.download(filePath, "Instalador_AgenteNFe.exe");
+  } else {
+    res.status(404).json({ error: "Arquivo instalador não encontrado no servidor." });
+  }
+});
+
 app.get("/api/download-batch", async (req, res) => {
   try {
     const db = getDB();

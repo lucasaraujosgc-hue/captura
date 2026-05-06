@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { Routes, Route, NavLink } from "react-router-dom";
-import { LayoutDashboard, Building2, FileText, UploadCloud, LogOut, HardDrive, Image as ImageIcon } from "lucide-react";
+import { LayoutDashboard, Building2, FileText, UploadCloud, LogOut, HardDrive, Image as ImageIcon, Download } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Empresas from "./pages/Empresas";
 import Notas from "./pages/Notas";
@@ -61,6 +61,16 @@ export default function App() {
           <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
           <NavItem to="/empresas" icon={Building2} label="Empresas" />
           <NavItem to="/relatorios" icon={FileText} label="Relatórios" />
+          
+          <a 
+            href={`/api/download-agente?token=${getToken()}`} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-4 py-3 rounded-full transition-all bg-blue-600 text-white font-semibold hover:bg-blue-700 shadow-lg mt-4 cursor-pointer"
+          >
+            <Download className="w-5 h-5 text-white" />
+            Download
+          </a>
         </nav>
         
         {/* Storage Widget Start */}
