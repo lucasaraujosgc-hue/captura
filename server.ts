@@ -42,7 +42,7 @@ const webAuthMiddleware = (req: express.Request, res: express.Response, next: ex
   
   // Exclude upload route and login route from this auth check
   // Note: Since this is mounted on '/api', req.path is relative (e.g. '/login')
-  if (req.path === '/upload' || req.path === '/login') {
+  if (req.path === '/upload' || req.path === '/login' || req.path === '/download-agente' || req.path.startsWith('/v1/export/')) {
     return next();
   }
 
