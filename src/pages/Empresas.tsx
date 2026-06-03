@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Building2, Plus, Copy, Check, ArrowRight, Search, Pencil, Trash2 } from "lucide-react";
+import { Building2, Plus, Copy, Check, ArrowRight, Search, Pencil, Trash2, Link as LinkIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getAuthHeaders } from "../lib/auth";
 
@@ -162,6 +162,29 @@ export default function Empresas() {
                     >
                       {copyingToken === emp.token ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {emp.export_token && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1"><LinkIcon className="w-3.5 h-3.5"/> Token de Exportação (API)</p>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 bg-gray-50 p-2 rounded border border-gray-200">
+                      <code className="text-xs text-gray-600 truncate flex-1">{emp.export_token}</code>
+                      <button 
+                        onClick={() => copyToken(emp.export_token)}
+                        className="p-1.5 text-gray-400 hover:text-green-600 bg-white rounded shadow-sm border border-gray-200"
+                        title="Copiar Token"
+                      >
+                        {copyingToken === emp.export_token ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div className="text-[10px] text-gray-500 bg-gray-100 p-2 rounded">
+                      <span className="font-semibold text-gray-700">Endpoint GET:</span>
+                      <br/>
+                      <code className="break-all">{window.location.origin}/api/v1/export/notas/{emp.export_token}</code>
+                    </div>
                   </div>
                 </div>
               )}

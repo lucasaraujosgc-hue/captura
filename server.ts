@@ -362,6 +362,16 @@ app.get("/api/empresas", async (req, res) => {
   try {
     const db = getDB();
     const empresas = await db.all("SELECT * FROM empresas ORDER BY nome");
+    
+    // Auto-generate missing export_tokens
+    for (const emp of empresas) {
+      if (!emp.export_token) {
+        const newExportToken = crypto.randomBytes(32).toString("hex");
+        await db.run("UPDATE empresas SET export_token = ? WHERE id = ?", [newExportToken, emp.id]);
+        emp.export_token = newExportToken;
+      }
+    }
+
     res.json(empresas);
   } catch(error) {
     res.status(500).json({ error: "Erro ao buscar empresas." });
@@ -494,9 +504,10 @@ app.post("/api/empresas", async (req, res) => {
     if (check) return res.status(400).json({ error: "Empresa com este CNPJ já existe." });
 
     const token = crypto.randomBytes(32).toString("hex");
-    const result = await db.run("INSERT INTO empresas (nome, cnpj, token) VALUES (?, ?, ?)", [nome, cnpj, token]);
+    const export_token = crypto.randomBytes(32).toString("hex");
+    const result = await db.run("INSERT INTO empresas (nome, cnpj, token, export_token) VALUES (?, ?, ?, ?)", [nome, cnpj, token, export_token]);
     
-    res.status(201).json({ success: true, id: result.lastID, token });
+    res.status(201).json({ success: true, id: result.lastID, token, export_token });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erro ao cadastrar empresa." });
@@ -828,6 +839,51 @@ app.get("/api/download-agente", (req, res) => {
       helper: "O arquivo deve estar acessível dentro do container em um destes caminhos.",
       tried: possiblePaths
     });
+  }
+});
+
+// Export API (Integration)
+app.get("/api/v1/export/notas/:export_token", async (req, res) => {
+  try {
+    const { export_token } = req.params;
+    const { data_inicio } = req.query;
+    
+    if (!export_token) return res.status(400).json({ error: "Token de exportação não fornecido." });
+    
+    const db = getDB();
+    const empresa = await db.get("SELECT id, nome, cnpj FROM empresas WHERE export_token = ?", [export_token]);
+    
+    if (!empresa) {
+      return res.status(401).json({ error: "Token de exportação inválido ou expirado." });
+    }
+    
+    // Build query to fetch notes
+    let query = "SELECT id, chave_nfe, fornecedor, cnpj_fornecedor, data_emissao, valor_total, modelo, tipo, status, cfop FROM notas WHERE empresa_id = ?";
+    const params: any[] = [empresa.id];
+    
+    if (data_inicio && typeof data_inicio === 'string') {
+      // allows fetching notes since a certain date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+      query += " AND data_emissao >= ?";
+      params.push(data_inicio);
+    }
+    
+    // For large tables, adding a limit could be a good idea, but avoiding for now to keep it simple
+    query += " ORDER BY data_emissao DESC LIMIT 1000";
+    
+    const notas = await db.all(query, params);
+    
+    res.json({
+      success: true,
+      empresa: {
+        nome: empresa.nome,
+        cnpj: empresa.cnpj
+      },
+      count: notas.length,
+      notas
+    });
+  } catch (error) {
+    console.error("Erro na exportação:", error);
+    res.status(500).json({ error: "Erro interno no servidor." });
   }
 });
 
